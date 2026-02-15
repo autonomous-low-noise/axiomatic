@@ -36,12 +36,20 @@ npm run dev
 
 ## Roadmap
 
+
+- [ ] bug: pdf opening is still super slow despite all advancements
+- [ ] bug: scrolling when zoomed performance is causing freezes
+- [ ] bug: opening page from preview tab is super slow too
+- [ ] bug: closing a tab (means opening another?) is super slow too
+
 - [ ] clip pdf selection
-- [ ]  bug: pdf bages a re being cut off
-- [ ] pdf overview as in `evince`
-- [ ] highlight pdf content - `sioyek`, but better
-- [ ] bookmark pdf page / paragraph - `sioyek`, but better
-- [ ] tabs
+- [ ] zen mode / command palette
+
+- [x]  bug: pdf bages a re being cut off
+- [x] pdf overview as in `evince`
+- [x] highlight pdf content - `sioyek`, but better
+- [x] bookmark pdf page / paragraph - `sioyek`, but better
+- [x] tabs
 
 - [ ] live-watch for OS changes
 - [ ] ability to create a parallel hierarchical structure to organize the files

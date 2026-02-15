@@ -14,7 +14,6 @@ import { TabBar } from '../components/TabBar'
 import { ReaderToolbar } from '../components/ReaderToolbar'
 import { NotesPanel } from '../components/NotesPanel'
 import { OutlineSidebar } from '../components/OutlineSidebar'
-import { ClipDialog } from '../components/ClipDialog'
 import { HighlightsPanel } from '../components/HighlightsPanel'
 import { BookmarksPanel } from '../components/BookmarksPanel'
 
@@ -71,7 +70,6 @@ export function ReaderPage() {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [clipOpen, setClipOpen] = useState(false)
   const [highlightsOpen, setHighlightsOpen] = useState(false)
   const [highlightsPaneWidth, setHighlightsPaneWidth] = useState(280)
   const [bookmarksOpen, setBookmarksOpen] = useState(false)
@@ -351,7 +349,6 @@ export function ReaderPage() {
         searchTotalMatches={search.totalMatches}
         onSearchNext={search.nextMatch}
         onSearchPrev={search.prevMatch}
-        onClip={() => setClipOpen(true)}
         savedProgressPage={savedProgressPage}
         onBackToProgress={handleBackToProgress}
       />
@@ -450,14 +447,6 @@ export function ReaderPage() {
           </>
         )}
       </div>
-      {clipOpen && (
-        <ClipDialog
-          fullPath={book.full_path}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onClose={() => setClipOpen(false)}
-        />
-      )}
     </div>
   )
 }

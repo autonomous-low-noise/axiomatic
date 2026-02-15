@@ -6,6 +6,7 @@ import { usePageTextLayer, type PageTextLayer } from '../hooks/usePageTextLayer'
 import type { Highlight } from '../hooks/useHighlights'
 import { TextLayer } from './TextLayer'
 import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
 
 const BASE_WIDTH = 800
 const PAGE_GAP = 16
@@ -98,6 +99,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     new Map(),
   )
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [clipStartPage, setClipStartPage] = useState<number | null>(null)
   const visibleRangeRef = useRef({ start: 1, end: 1 })
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1
@@ -546,6 +548,37 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     setContextMenu(null)
   }, [contextMenu, onDeleteHighlight, onDeleteHighlightGroup])
 
+  const handleClipStart = useCallback((pageNum: number) => {
+    setClipStartPage(pageNum)
+    setContextMenu(null)
+  }, [])
+
+  const handleClipEnd = useCallback(async (pageNum: number) => {
+    if (clipStartPage == null) return
+    setContextMenu(null)
+    try {
+      const outputPath = await save({
+        defaultPath: `clip_p${clipStartPage}-${pageNum}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      })
+      if (!outputPath) return
+      await invoke('clip_pdf', {
+        sourcePath: fullPath,
+        startPage: clipStartPage,
+        endPage: pageNum,
+        outputPath,
+      })
+    } catch (e) {
+      console.error('clip_pdf failed:', e)
+    }
+    setClipStartPage(null)
+  }, [clipStartPage, fullPath])
+
+  const handleClipCancel = useCallback(() => {
+    setClipStartPage(null)
+    setContextMenu(null)
+  }, [])
+
   const encodedPath = encodeURIComponent(fullPath)
 
   // Memoize page list — stable during zoom (all deps are committedZoom-based)
@@ -562,12 +595,20 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           const pageHighlights = highlightsForPage?.(pageNum)
           const textLayer = pageTextLayers.get(pageNum)
 
+          const isClipStart = clipStartPage === pageNum
+          const inClipRange = clipStartPage != null && pageNum >= clipStartPage
+
           return (
             <div
               key={pageNum}
               data-page-number={pageNum}
               className="absolute left-0 shadow-md"
-              style={{ top, width: layoutWidth, height: pageHeight }}
+              style={{
+                top,
+                width: layoutWidth,
+                height: pageHeight,
+                ...(isClipStart ? { borderTop: '3px solid #268bd2' } : inClipRange ? { borderTop: '2px solid #268bd2', opacity: 0.85 } : {}),
+              }}
               onContextMenu={(e) => handleContextMenu(e, pageNum)}
             >
               <img
@@ -621,7 +662,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           )
         },
       ),
-    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, pageLinks, pageTextLayers, highlightsForPage, handleContextMenu, handleLinkClick],
+    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, pageLinks, pageTextLayers, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage],
   )
 
   return (
@@ -686,15 +727,52 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
             </>
           )}
           {contextMenu.type === 'page' && (
-            <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
-              onClick={handlePageBookmark}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-              </svg>
-              Bookmark page
-            </button>
+            <>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                onClick={handlePageBookmark}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                Bookmark page
+              </button>
+              <div className="my-1 h-px bg-[#eee8d5] dark:bg-[#073642]" />
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                onClick={() => handleClipStart(contextMenu.pageNum!)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                </svg>
+                Mark clip start
+              </button>
+              {clipStartPage != null && contextMenu.pageNum! > clipStartPage && (
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                  onClick={() => handleClipEnd(contextMenu.pageNum!)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                  </svg>
+                  Mark clip end (pages {clipStartPage}–{contextMenu.pageNum})
+                </button>
+              )}
+              {clipStartPage != null && (
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#dc322f] hover:bg-[#eee8d5] dark:hover:bg-[#073642]"
+                  onClick={handleClipCancel}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                  Cancel clip
+                </button>
+              )}
+            </>
           )}
           {contextMenu.type === 'highlight' && (
             <button

@@ -28,7 +28,6 @@ interface Props {
   searchTotalMatches: number
   onSearchNext: () => void
   onSearchPrev: () => void
-  onClip: () => void
   savedProgressPage?: number | null
   onBackToProgress?: () => void
 }
@@ -55,7 +54,6 @@ export function ReaderToolbar({
   searchTotalMatches,
   onSearchNext,
   onSearchPrev,
-  onClip,
   savedProgressPage,
   onBackToProgress,
 }: Props) {
@@ -241,16 +239,6 @@ export function ReaderToolbar({
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M2 17l10 5 10-5" />
               <path d="M2 12l10 5 10-5" />
-            </svg>
-          </button>
-          <button
-            onClick={onClip}
-            className={iconBtnClass}
-            aria-label="Clip pages"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             </svg>
           </button>
           <div className="mx-1 h-4 w-px bg-[#eee8d5] dark:bg-[#073642]" />
