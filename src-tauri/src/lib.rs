@@ -6,13 +6,41 @@ mod pdf_engine;
 mod pdf_models;
 mod pdf_protocol;
 
-use commands::DbState;
+use commands::{DbState, PendingFile};
 use pdf_commands::PdfState;
 use pdf_models::new_shared_render_cache;
 use pdfium_render::prelude::*;
 use std::sync::atomic::AtomicU64;
 use std::sync::{mpsc, Arc, Mutex};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+
+fn find_pdf_in_args(args: &[String]) -> Option<String> {
+    for arg in args.iter().skip(1) {
+        // Skip flags
+        if arg.starts_with('-') {
+            continue;
+        }
+        // Handle file:// URLs
+        if let Some(path) = arg.strip_prefix("file://") {
+            let decoded = url::form_urlencoded::parse(path.as_bytes())
+                .map(|(k, v)| if v.is_empty() { k.to_string() } else { format!("{}={}", k, v) })
+                .collect::<String>();
+            if decoded.to_lowercase().ends_with(".pdf") {
+                return Some(decoded);
+            }
+        }
+        if arg.to_lowercase().ends_with(".pdf") {
+            return Some(arg.clone());
+        }
+    }
+    None
+}
+
+fn handle_file_open(app: &tauri::AppHandle, args: &[String]) {
+    if let Some(path) = find_pdf_in_args(args) {
+        let _ = app.emit("open-file", path);
+    }
+}
 
 fn pdfium_lib_name() -> &'static str {
     if cfg!(target_os = "macos") {
@@ -36,6 +64,13 @@ pub fn run() {
     let cache_render = Arc::clone(&render_cache);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            handle_file_open(app, &args);
+            // Focus the main window
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .register_uri_scheme_protocol("pdfium", move |_ctx, request| {
@@ -57,6 +92,11 @@ pub fn run() {
             let db_path = app_data.join("axiomatic.db");
             let conn = db::init_db(&db_path).expect("failed to init database");
             app.manage(DbState(Mutex::new(conn)));
+
+            // Check CLI args for a PDF file path
+            let args: Vec<String> = std::env::args().collect();
+            let pending = find_pdf_in_args(&args);
+            app.manage(PendingFile(Mutex::new(pending)));
 
             // Find PDFium shared library
             let lib_name = pdfium_lib_name();
@@ -136,6 +176,9 @@ pub fn run() {
             commands::untag_book,
             commands::list_book_tags_all,
             commands::open_url,
+            commands::get_platform,
+            commands::open_file,
+            commands::get_pending_file,
             commands::list_highlights,
             commands::create_highlight,
             commands::delete_highlight,
