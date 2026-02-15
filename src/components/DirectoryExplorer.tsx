@@ -23,7 +23,7 @@ export function DirectoryExplorer({
     setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }))
 
   return (
-    <div className="fixed inset-y-0 left-0 z-30 flex w-80 flex-col border-r border-[#eee8d5] bg-[#fdf6e3] shadow-lg dark:border-[#073642] dark:bg-[#002b36]">
+    <div className="absolute inset-y-0 left-0 z-30 flex w-80 flex-col border-r border-[#eee8d5] bg-[#fdf6e3] shadow-lg dark:border-[#073642] dark:bg-[#002b36]">
       <div className="flex items-center justify-between border-b border-[#eee8d5] px-4 py-3 dark:border-[#073642]">
         <h2 className="text-sm font-semibold text-[#073642] dark:text-[#eee8d5]">
           Library Sources

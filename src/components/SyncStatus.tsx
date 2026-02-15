@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { subscribeProgress } from '../lib/load-queue'
 import type { SyncPhase } from '../hooks/useSyncStatus'
 
 interface SyncStatusProps {
@@ -25,12 +24,12 @@ function Checkmark() {
   )
 }
 
-function ProgressBar({ progress, indeterminate }: { progress: number; indeterminate: boolean }) {
+function ProgressBar() {
   return (
     <div className="w-16 h-1 rounded-full bg-[#eee8d5] dark:bg-[#073642]">
       <div
-        className={`h-1 rounded-full bg-[#93a1a1] dark:bg-[#586e75] transition-all duration-300 ${indeterminate ? 'animate-pulse' : ''}`}
-        style={{ width: indeterminate ? '30%' : `${progress * 100}%` }}
+        className="h-1 rounded-full bg-[#93a1a1] dark:bg-[#586e75] animate-pulse"
+        style={{ width: '30%' }}
       />
     </div>
   )
@@ -41,19 +40,6 @@ export function SyncStatus({ phase, label, bookCount }: SyncStatusProps) {
   const [faded, setFaded] = useState(false)
   const fadeTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const unmountTimer = useRef<ReturnType<typeof setTimeout>>(null)
-
-  // Subscribe to queue progress directly so OverviewPage doesn't re-render
-  const [fraction, setFraction] = useState(0)
-  useEffect(
-    () =>
-      subscribeProgress((s) => {
-        setFraction((prev) => {
-          const next = s.total > 0 ? s.completed / s.total : 0
-          return prev === next ? prev : next
-        })
-      }),
-    [],
-  )
 
   useEffect(() => {
     if (fadeTimer.current) clearTimeout(fadeTimer.current)
@@ -78,14 +64,12 @@ export function SyncStatus({ phase, label, bookCount }: SyncStatusProps) {
   if (bookCount === 0 || !visible) return null
 
   const isDone = phase === 'done'
-  const indeterminate = phase === 'scanning' || phase === 'rendering'
-  const progress = phase === 'loading' ? fraction : phase === 'done' ? 1 : 0
 
   return (
     <span
       className={`ml-auto flex items-center gap-1.5 text-xs text-[#93a1a1] transition-opacity duration-500 dark:text-[#586e75] ${faded ? 'opacity-0' : 'opacity-100'}`}
     >
-      {isDone ? <Checkmark /> : <ProgressBar progress={progress} indeterminate={indeterminate} />}
+      {isDone ? <Checkmark /> : <ProgressBar />}
       {label}
     </span>
   )

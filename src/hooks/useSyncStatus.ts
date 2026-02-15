@@ -1,7 +1,4 @@
-import { useEffect, useState } from 'react'
-import { subscribeProgress } from '../lib/load-queue'
-
-export type SyncPhase = 'scanning' | 'rendering' | 'loading' | 'done'
+export type SyncPhase = 'scanning' | 'rendering' | 'done'
 
 export interface SyncStatusResult {
   phase: SyncPhase
@@ -14,23 +11,11 @@ export function useSyncStatus(
   totalItems: number,
   renderLimit: number,
 ): SyncStatusResult {
-  const [queueIdle, setQueueIdle] = useState(true)
-
-  useEffect(
-    () =>
-      subscribeProgress((s) => {
-        setQueueIdle((prev) => (prev === s.idle ? prev : s.idle))
-      }),
-    [],
-  )
-
   let phase: SyncPhase
   if (loading) {
     phase = 'scanning'
   } else if (renderLimit < totalItems) {
     phase = 'rendering'
-  } else if (!queueIdle) {
-    phase = 'loading'
   } else {
     phase = 'done'
   }

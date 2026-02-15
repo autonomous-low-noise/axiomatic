@@ -1,33 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+// Matches TileGrid's responsive breakpoints:
+// grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6
+function getColumns(): number {
+  const width = window.innerWidth
+  if (width >= 1280) return 6
+  if (width >= 1024) return 5
+  if (width >= 768) return 4
+  if (width >= 640) return 3
+  return 2
+}
 
 export function useVimOverview(
   slugs: string[],
-  gridRef: React.RefObject<HTMLDivElement | null>,
+  _gridRef: React.RefObject<HTMLDivElement | null>,
   sectionSizes: number[],
 ) {
   const [selectedIndex, setSelectedIndex] = useState(-1)
-  const columnsRef = useRef(1)
+  const columnsRef = useRef(getColumns())
   const navigate = useNavigate()
 
-  // Detect column count from grid computed style
-  const updateColumns = useCallback(() => {
-    const el = gridRef.current
-    if (!el) return
-    const cols = getComputedStyle(el).gridTemplateColumns.split(' ').length
-    columnsRef.current = cols
-  }, [gridRef])
-
+  // Keep columns in sync with window width
   useEffect(() => {
-    const el = gridRef.current
-    if (!el) return
-
-    updateColumns()
-
-    const observer = new ResizeObserver(() => updateColumns())
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [gridRef, updateColumns, slugs])
+    const onResize = () => {
+      columnsRef.current = getColumns()
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

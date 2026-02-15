@@ -4,14 +4,20 @@ import type { EditorView } from '@codemirror/view'
 
 export type ActivePane = 'pdf' | 'notes'
 
-const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 5
+const ZOOM_FACTOR = 1.1
+
+function clampZoom(z: number): number {
+  return Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z)) * 100) / 100
+}
 
 interface Options {
   pdfContainerRef: RefObject<HTMLDivElement | null>
   notesOpen: boolean
   setNotesOpen: (open: boolean) => void
   editorRef: RefObject<EditorView | null>
-  zoom: number
+  zoomRef: RefObject<number>
   onZoomChange: (zoom: number) => void
   onBack: () => void
 }
@@ -27,7 +33,7 @@ export function useVimReader({
   notesOpen,
   setNotesOpen,
   editorRef,
-  zoom,
+  zoomRef,
   onZoomChange,
   onBack,
 }: Options) {
@@ -56,18 +62,12 @@ export function useVimReader({
       // Zoom in/out regardless of active pane
       if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
-        const idx = ZOOM_STEPS.indexOf(zoom)
-        if (idx >= 0 && idx < ZOOM_STEPS.length - 1) {
-          onZoomChange(ZOOM_STEPS[idx + 1])
-        }
+        onZoomChange(clampZoom(zoomRef.current * ZOOM_FACTOR))
         return
       }
       if (e.ctrlKey && e.key === '-') {
         e.preventDefault()
-        const idx = ZOOM_STEPS.indexOf(zoom)
-        if (idx > 0) {
-          onZoomChange(ZOOM_STEPS[idx - 1])
-        }
+        onZoomChange(clampZoom(zoomRef.current / ZOOM_FACTOR))
         return
       }
 
@@ -135,7 +135,21 @@ export function useVimReader({
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [pdfContainerRef, notesOpen, setNotesOpen, editorRef, zoom, onZoomChange, onBack])
+  }, [pdfContainerRef, notesOpen, setNotesOpen, editorRef, onZoomChange, onBack])
+
+  // Ctrl+wheel zoom
+  useEffect(() => {
+    const container = pdfContainerRef.current
+    if (!container) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const direction = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR
+      onZoomChange(clampZoom(zoomRef.current * direction))
+    }
+    container.addEventListener('wheel', onWheel, { passive: false })
+    return () => container.removeEventListener('wheel', onWheel)
+  }, [pdfContainerRef, onZoomChange])
 
   return { activePane }
 }

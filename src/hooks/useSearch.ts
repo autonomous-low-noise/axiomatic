@@ -1,37 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { useCallback, useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 export interface SearchMatch {
   page: number
-  charStart: number
-  charEnd: number
+  match_index: number
 }
 
-export function useSearch(pdfDocument: PDFDocumentProxy | null) {
+export function useSearch(fullPath: string | undefined) {
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<SearchMatch[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const pageTextsRef = useRef<string[] | null>(null)
-
-  // Extract text from all pages (cached after first extraction)
-  const extractTexts = useCallback(async () => {
-    if (!pdfDocument || pageTextsRef.current) return pageTextsRef.current
-    const texts: string[] = []
-    for (let i = 1; i <= pdfDocument.numPages; i++) {
-      const page = await pdfDocument.getPage(i)
-      const content = await page.getTextContent()
-      const str = content.items
-        .map((item) => ('str' in item ? item.str : ''))
-        .join('')
-      texts.push(str)
-    }
-    pageTextsRef.current = texts
-    return texts
-  }, [pdfDocument])
 
   // Search whenever query changes
   useEffect(() => {
-    if (!query.trim()) {
+    if (!query.trim() || !fullPath) {
       setMatches([])
       setCurrentIndex(0)
       return
@@ -39,32 +21,23 @@ export function useSearch(pdfDocument: PDFDocumentProxy | null) {
 
     let cancelled = false
 
-    extractTexts().then((texts) => {
-      if (cancelled || !texts) return
-      const found: SearchMatch[] = []
-      const lowerQuery = query.toLowerCase()
-      for (let pageIdx = 0; pageIdx < texts.length; pageIdx++) {
-        const text = texts[pageIdx].toLowerCase()
-        let start = 0
-        while (true) {
-          const idx = text.indexOf(lowerQuery, start)
-          if (idx === -1) break
-          found.push({
-            page: pageIdx + 1,
-            charStart: idx,
-            charEnd: idx + lowerQuery.length,
-          })
-          start = idx + 1
+    invoke<SearchMatch[]>('search_document', { path: fullPath, query })
+      .then((results) => {
+        if (cancelled) return
+        setMatches(results)
+        setCurrentIndex(0)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMatches([])
+          setCurrentIndex(0)
         }
-      }
-      setMatches(found)
-      setCurrentIndex(0)
-    })
+      })
 
     return () => {
       cancelled = true
     }
-  }, [query, extractTexts])
+  }, [query, fullPath])
 
   const nextMatch = useCallback(() => {
     if (matches.length === 0) return
@@ -86,6 +59,5 @@ export function useSearch(pdfDocument: PDFDocumentProxy | null) {
     currentMatchPage,
     nextMatch,
     prevMatch,
-    searchMatches: matches,
   }
 }

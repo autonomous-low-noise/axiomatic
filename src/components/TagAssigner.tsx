@@ -26,7 +26,7 @@ export function TagAssigner({ slug, title, tags, bookTags, onTag, onUntag, onClo
   return (
     <div
       ref={ref}
-      className="fixed inset-y-0 right-0 z-30 flex w-64 flex-col border-l border-[#eee8d5] bg-[#fdf6e3] shadow-lg dark:border-[#073642] dark:bg-[#002b36]"
+      className="absolute inset-y-0 right-0 z-30 flex w-64 flex-col border-l border-[#eee8d5] bg-[#fdf6e3] shadow-lg dark:border-[#073642] dark:bg-[#002b36]"
     >
       <div className="flex items-center justify-between border-b border-[#eee8d5] px-4 py-3 dark:border-[#073642]">
         <div className="min-w-0 flex-1">

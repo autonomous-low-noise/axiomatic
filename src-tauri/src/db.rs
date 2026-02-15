@@ -46,7 +46,35 @@ pub fn init_db(db_path: &Path) -> Result<Connection> {
             book_slug TEXT NOT NULL,
             tag_id    INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
             UNIQUE(book_slug, tag_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS highlights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL,
+            page INTEGER NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            width REAL NOT NULL,
+            height REAL NOT NULL,
+            color TEXT NOT NULL,
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_highlights_slug_page ON highlights(slug, page);
+
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL,
+            page INTEGER NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(slug, page)
         );",
     )?;
+    // Migrations: add text and group_id columns to highlights
+    conn.execute_batch("ALTER TABLE highlights ADD COLUMN text TEXT NOT NULL DEFAULT ''").ok();
+    conn.execute_batch("ALTER TABLE highlights ADD COLUMN group_id TEXT NOT NULL DEFAULT ''").ok();
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_highlights_group_id ON highlights(group_id)").ok();
+
     Ok(conn)
 }

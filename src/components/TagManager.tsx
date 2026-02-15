@@ -16,13 +16,13 @@ export function TagManager({ tags, anchorRef, onCreate, onDelete, onUpdateColor,
   const [newName, setNewName] = useState('')
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
 
   useEffect(() => {
     const anchor = anchorRef.current
     if (!anchor) return
     const rect = anchor.getBoundingClientRect()
-    setPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4 })
+    setPos({ left: rect.left, top: rect.bottom + 4 })
   }, [anchorRef])
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function TagManager({ tags, anchorRef, onCreate, onDelete, onUpdateColor,
   return createPortal(
     <div
       ref={ref}
-      style={{ left: pos.left, bottom: pos.bottom, position: 'fixed' }}
+      style={{ left: pos.left, top: pos.top, position: 'fixed' }}
       className="z-50 w-56 rounded-md border border-[#eee8d5] bg-[#fdf6e3] py-1 shadow-lg dark:border-[#073642] dark:bg-[#073642]"
     >
       <div className="max-h-48 overflow-y-auto">

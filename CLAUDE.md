@@ -5,22 +5,30 @@ Solarized-themed desktop PDF reader for math textbooks. Tauri 2 + React 19 + Typ
 ## Quick reference
 
 ```
-src/pages/OverviewPage.tsx    — library grid (starred section + per-directory sections)
-src/pages/ReaderPage.tsx      — PDF viewer + notes split-pane
-src/components/PdfThumbnail.tsx — lazy thumbnail pipeline (see docs/pdf-pipeline.md)
-src/components/PdfViewer.tsx  — virtual-scroll PDF renderer (buffer=5 pages)
-src/components/NotesPanel.tsx — CodeMirror 6 with vim, markdown, KaTeX math
-src/lib/load-queue.ts        — concurrency limiter (MAX_CONCURRENT=2)
-src-tauri/src/commands.rs     — all Tauri IPC commands
-src-tauri/src/db.rs           — SQLite schema (directories, notes, note_images)
+src/pages/OverviewPage.tsx       — library grid (starred section + per-directory sections)
+src/pages/ReaderPage.tsx         — PDF viewer + notes split-pane + tabs
+src/components/PdfThumbnail.tsx  — lazy thumbnail via pdfium:// protocol
+src/components/PdfViewer.tsx     — virtual-scroll PDF renderer (buffer=5 pages, imperative zoom)
+src/components/NotesPanel.tsx    — CodeMirror 6 with vim, markdown, KaTeX math
+src/components/TabBar.tsx        — horizontal tab strip for open documents
+src/components/HighlightsPanel.tsx — highlights list pane (grouped by page)
+src/components/BookmarksPanel.tsx  — bookmarks list pane (highlights with color="bookmark")
+src/lib/thumbnail-queue.ts      — concurrency limiter (MAX_CONCURRENT=3)
+src-tauri/src/commands.rs        — general Tauri IPC commands (db, files, tags)
+src-tauri/src/pdf_commands.rs    — PDF-specific IPC commands (open, outline, links, text, search, clip)
+src-tauri/src/pdf_engine.rs      — PDFium render thread (mpsc recv loop, LRU cache)
+src-tauri/src/pdf_protocol.rs    — pdfium:// custom protocol handler
+src-tauri/src/db.rs              — SQLite schema (directories, notes, note_images, tags, highlights)
 ```
 
 ## Architecture
 
 ```
-React (Vite + SWC)  <--IPC-->  Tauri/Rust  <--->  SQLite
-                                            <--->  File system (PDF dirs)
+React (Vite + SWC)  <──IPC──>  Tauri/Rust  <───>  SQLite
+                    <──pdfium://>  PDFium   <───>  File system (PDF dirs)
 ```
+
+PDF rendering uses PDFium (C library) via `pdfium-render` crate. Pages served as JPEG via `pdfium://` custom protocol. Render thread handles page rendering, text extraction, outlines, links, search, and clipping. Document open runs on `spawn_blocking` (off the render thread) for instant response.
 
 Routes: `/` OverviewPage, `/read/:slug` ReaderPage. Layout wraps both with custom Titlebar.
 
@@ -32,19 +40,22 @@ Routes: `/` OverviewPage, `/read/:slug` ReaderPage. Layout wraps both with custo
 | Starred books | localStorage | same |
 | Theme | localStorage | custom store with OS detection (dbus + matchMedia) |
 | Notes | SQLite | in-memory Map cache, 150ms debounced writes |
-| Thumbnails | IndexedDB v2 | `thumbnail-cache.ts`, keyed by slug |
+| Highlights | SQLite | `useHighlights` hook, bookmarks stored as `color="bookmark"` |
+| Tabs | React state | `useTabs` hook with reopen stack |
 
 `createLocalStorageStore` (lib/createStore.ts) is a generic factory: `load()` returns parsed snapshot, `emitChange()` re-reads from localStorage and notifies subscribers. Beware: `JSON.parse` creates new object references for every entry on every emit — use value-based memo comparators (see BookTile).
 
 ## Performance-critical paths
 
-**Thumbnail pipeline** — see `docs/pdf-pipeline.md` for the full diagram. Key invariant: the load-queue holds each slot for the entire render lifecycle (not just file I/O), so at most MAX_CONCURRENT PDFs are being parsed by pdfjs-dist at once.
+**Thumbnail pipeline** — see `docs/pdf-pipeline.md`. Thumbnails are `<img>` tags pointing at `pdfium://` URLs. `thumbnail-queue.ts` limits concurrent loads to 3; no IndexedDB cache needed.
+
+**Zoom** — two-tier imperative system. Immediate: CSS `transform: scale()` via `useImperativeHandle` (no React re-render). Committed: 300ms debounced `startTransition` re-render for layout recalculation. See `docs/pdf-pipeline.md` for details.
+
+**Document open** — `open_document` runs on `spawn_blocking`, not the render thread. Generation counter (`AtomicU64`) preempts stale renders. Module-level caches in `useDocument` and `useTextbooks` avoid re-fetching on navigation.
 
 **OverviewPage re-renders** — `BookTile` is `memo`'d with a custom comparator that checks `progress.currentPage` and `progress.totalPages` by value (not reference), because the localStorage store creates fresh objects on every read. `handleTotalPages` uses a ref to avoid depending on the `progress` object.
 
 **useBatchedRender** — progressively mounts BookTiles in batches of 20 via requestAnimationFrame, preventing initial load from blocking the main thread.
-
-**SyncStatus** subscribes to queue progress directly (not through OverviewPage state) so progress bar updates don't re-render the page.
 
 ## Conventions
 
@@ -52,7 +63,7 @@ Routes: `/` OverviewPage, `/read/:slug` ReaderPage. Layout wraps both with custo
 - Tailwind 4 with `dark:` variants; dark mode toggled via `<html class="dark">`
 - Vim keybindings everywhere: h/j/k/l in overview grid, j/k scroll in reader, full vim in notes editor
 - No component library — all UI is hand-written
-- PDFs served via Tauri asset protocol (`convertFileSrc(fullPath)`)
+- PDFs rendered via `pdfium://` custom protocol (native PDFium, JPEG output)
 
 ## Commands
 
@@ -65,7 +76,7 @@ npx tsc --noEmit     # type-check
 
 ## Known gotchas
 
-- `readFile` from `@tauri-apps/plugin-fs` deserializes entire file on JS main thread — never use for thumbnails (50MB+ math textbooks freeze the UI). Thumbnails use asset URLs fetched by pdfjs worker instead.
-- IndexedDB thumbnail cache uses DB_VERSION for cache busting. Bump version in `thumbnail-cache.ts` if the cached format changes.
+- PDFium shared library (`libpdfium.so`/`.dylib`/`.dll`) must be in `src-tauri/resources/` for dev or bundled as a Tauri resource for production. Download from https://github.com/bblanchon/pdfium-binaries.
+- `Pdfium` is `Box::leak`'d to `&'static` — shared via `PdfiumHandle` wrapper (unsafe Send+Sync) and `usize` pointer casts for closures. See `lib.rs` setup.
 - `loadProgress()` / `loadStarred()` do `JSON.parse` on every call, creating new object trees. Any `useMemo` or `memo` that depends on entries from these maps must compare by value, not reference.
-- pdfjs worker configured in `main.tsx` — must point to the react-pdf bundled worker path.
+- Bookmarks are highlights with `color = "bookmark"` — `useHighlights` splits them via `colorHighlights` / `bookmarkHighlights`.

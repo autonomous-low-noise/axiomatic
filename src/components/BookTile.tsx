@@ -1,6 +1,5 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { convertFileSrc } from '@tauri-apps/api/core'
 import type { BookProgress } from '../types/progress'
 import type { Tag } from '../hooks/useTags'
 import { PdfThumbnail } from './PdfThumbnail'
@@ -14,7 +13,6 @@ interface Props {
   selected?: boolean
   tags?: Tag[]
   onToggleStar?: (slug: string) => void
-  onTotalPages?: (slug: string, total: number) => void
   onContextMenu?: (slug: string, x: number, y: number) => void
 }
 
@@ -26,7 +24,6 @@ export const BookTile = memo(function BookTile({
   starred,
   selected,
   onToggleStar,
-  onTotalPages,
   onContextMenu,
   tags,
 }: Props) {
@@ -34,10 +31,17 @@ export const BookTile = memo(function BookTile({
     ? `${progress.currentPage}/${progress.totalPages}`
     : null
 
-  const pdfUrl = convertFileSrc(fullPath)
+  const tileRef = useRef<HTMLAnchorElement>(null)
+
+  useEffect(() => {
+    if (selected && tileRef.current) {
+      tileRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [selected])
 
   return (
     <Link
+      ref={tileRef}
       to={`/read/${slug}`}
       className={`group flex flex-col gap-2 rounded-lg p-2 hover:bg-[#eee8d5] dark:hover:bg-[#073642] ${selected ? 'ring-2 ring-[#268bd2] bg-[#268bd2]/10 dark:bg-[#268bd2]/20' : ''}`}
       onContextMenu={(e) => {
@@ -46,12 +50,7 @@ export const BookTile = memo(function BookTile({
       }}
     >
       <div className="relative">
-        <PdfThumbnail
-          file={pdfUrl}
-          fullPath={fullPath}
-          cacheKey={slug}
-          onTotalPages={onTotalPages ? (total) => onTotalPages(slug, total) : undefined}
-        />
+        <PdfThumbnail fullPath={fullPath} />
         {progressText && (
           <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-0.5 text-xs font-medium text-white">
             {progressText}
@@ -109,7 +108,6 @@ export const BookTile = memo(function BookTile({
   prev.selected === next.selected &&
   prev.tags === next.tags &&
   prev.onToggleStar === next.onToggleStar &&
-  prev.onTotalPages === next.onTotalPages &&
   prev.onContextMenu === next.onContextMenu &&
   prev.progress?.currentPage === next.progress?.currentPage &&
   prev.progress?.totalPages === next.progress?.totalPages)

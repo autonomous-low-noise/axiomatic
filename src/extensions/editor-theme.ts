@@ -73,7 +73,7 @@ export function editorTheme(dark: boolean) {
         '.cm-scroller': {
           overflow: 'auto',
           fontFamily:
-            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+            "'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
         },
         '.cm-content': {
           padding: '16px',

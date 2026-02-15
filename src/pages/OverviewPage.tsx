@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { useTextbooks } from '../hooks/useTextbooks'
@@ -28,7 +28,7 @@ interface MenuState {
 export function OverviewPage() {
   const { textbooks, loading, refresh } = useTextbooks()
   const { directories, add: addDir, remove: removeDir } = useDirectories()
-  const { progress, update } = useProgress()
+  const { progress } = useProgress()
   const { starred, toggle } = useStarred()
   const { tags, bookTags, createTag, deleteTag, tagBook, untagBook, updateTagColor } = useTags()
   const gridRef = useRef<HTMLDivElement>(null)
@@ -128,17 +128,6 @@ export function OverviewPage() {
     [removeDir, refresh],
   )
 
-  // Stable callback for onTotalPages — use ref to avoid depending on progress
-  const progressRef = useRef(progress) as RefObject<typeof progress>
-  progressRef.current = progress
-  const handleTotalPages = useCallback(
-    (slug: string, total: number) => {
-      if (!progressRef.current[slug]?.totalPages) {
-        update(slug, { totalPages: total })
-      }
-    },
-    [update],
-  )
 
   const menuItems: MenuItem[] = menu
     ? (() => {
@@ -221,88 +210,8 @@ export function OverviewPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-      {loading ? (
-        <div className="flex flex-1 items-center justify-center py-20">
-          <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
-        </div>
-      ) : (<>
-      {starredBooks.length > 0 && remaining > 0 && (
-        <section>
-          <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
-            Starred
-          </h2>
-          <TileGrid gridRef={getGridRef()}>
-            {starredBooks.slice(0, remaining).map((book, i) => {
-              const idx = flatOffset + i
-              return (
-                <BookTile
-                  key={book.slug}
-                  slug={book.slug}
-                  title={book.title}
-                  fullPath={book.full_path}
-                  progress={progress[book.slug]}
-                  starred={!!starred[book.slug]}
-                  selected={selectedIndex === idx}
-                  onToggleStar={toggle}
-                  onContextMenu={handleContextMenu}
-                  onTotalPages={handleTotalPages}
-                  tags={bookTags[book.slug]}
-                />
-              )
-            })}
-          </TileGrid>
-          {(() => {
-            const shown = Math.min(starredBooks.length, remaining)
-            remaining -= shown
-            flatOffset += starredBooks.length
-            return null
-          })()}
-        </section>
-      )}
-      {dirSections.map((sec) => {
-        if (remaining <= 0) {
-          flatOffset += sec.books.length
-          return null
-        }
-        const sectionStart = flatOffset
-        const booksToShow = sec.books.slice(0, remaining)
-        remaining -= booksToShow.length
-        flatOffset += sec.books.length
-        return (
-          <section key={sec.dir.id}>
-            <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
-              {sec.dir.label}
-            </h2>
-            <TileGrid gridRef={getGridRef()}>
-              {booksToShow.map((book, i) => (
-                <BookTile
-                  key={book.slug}
-                  slug={book.slug}
-                  title={book.title}
-                  fullPath={book.full_path}
-                  progress={progress[book.slug]}
-                  starred={!!starred[book.slug]}
-                  selected={selectedIndex === sectionStart + i}
-                  onToggleStar={toggle}
-                  onContextMenu={handleContextMenu}
-                  onTotalPages={handleTotalPages}
-                  tags={bookTags[book.slug]}
-                />
-              ))}
-            </TileGrid>
-          </section>
-        )
-      })}
-      {textbooks.length === 0 && directories.length > 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-[#93a1a1] dark:text-[#657b83]">
-          <p className="text-sm">No PDFs found in attached directories.</p>
-        </div>
-      )}
-      </>)}
-      </div>
-      <footer className="flex h-10 shrink-0 items-center border-t border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
+      <div className="flex h-10 shrink-0 items-center border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           {filterOpen ? (
             <div className="relative flex shrink-0 items-center">
@@ -408,7 +317,85 @@ export function OverviewPage() {
           <ThemeToggle />
           <SyncStatus {...syncStatus} />
         </div>
-      </footer>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center py-20">
+          <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
+        </div>
+      ) : (<>
+      {starredBooks.length > 0 && remaining > 0 && (
+        <section>
+          <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
+            Starred
+          </h2>
+          <TileGrid gridRef={getGridRef()}>
+            {starredBooks.slice(0, remaining).map((book, i) => {
+              const idx = flatOffset + i
+              return (
+                <BookTile
+                  key={book.slug}
+                  slug={book.slug}
+                  title={book.title}
+                  fullPath={book.full_path}
+                  progress={progress[book.slug]}
+                  starred={!!starred[book.slug]}
+                  selected={selectedIndex === idx}
+                  onToggleStar={toggle}
+                  onContextMenu={handleContextMenu}
+                  tags={bookTags[book.slug]}
+                />
+              )
+            })}
+          </TileGrid>
+          {(() => {
+            const shown = Math.min(starredBooks.length, remaining)
+            remaining -= shown
+            flatOffset += starredBooks.length
+            return null
+          })()}
+        </section>
+      )}
+      {dirSections.map((sec) => {
+        if (remaining <= 0) {
+          flatOffset += sec.books.length
+          return null
+        }
+        const sectionStart = flatOffset
+        const booksToShow = sec.books.slice(0, remaining)
+        remaining -= booksToShow.length
+        flatOffset += sec.books.length
+        return (
+          <section key={sec.dir.id}>
+            <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
+              {sec.dir.label}
+            </h2>
+            <TileGrid gridRef={getGridRef()}>
+              {booksToShow.map((book, i) => (
+                <BookTile
+                  key={book.slug}
+                  slug={book.slug}
+                  title={book.title}
+                  fullPath={book.full_path}
+                  progress={progress[book.slug]}
+                  starred={!!starred[book.slug]}
+                  selected={selectedIndex === sectionStart + i}
+                  onToggleStar={toggle}
+                  onContextMenu={handleContextMenu}
+                  tags={bookTags[book.slug]}
+                />
+              ))}
+            </TileGrid>
+          </section>
+        )
+      })}
+      {textbooks.length === 0 && directories.length > 0 && (
+        <div className="flex flex-col items-center justify-center py-20 text-[#93a1a1] dark:text-[#657b83]">
+          <p className="text-sm">No PDFs found in attached directories.</p>
+        </div>
+      )}
+      </>)}
+      </div>
       {tagManagerOpen && (
         <TagManager
           tags={tags}

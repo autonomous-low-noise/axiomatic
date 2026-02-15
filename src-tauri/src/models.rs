@@ -42,6 +42,22 @@ pub struct BookTagMapping {
     pub tags: Vec<Tag>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Highlight {
+    pub id: i64,
+    pub slug: String,
+    pub page: i64,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub color: String,
+    pub note: String,
+    pub text: String,
+    pub group_id: String,
+    pub created_at: String,
+}
+
 impl BookTagMapping {
     pub fn group_from_rows(rows: Vec<(String, i64, String, String)>) -> Vec<BookTagMapping> {
         let mut map: HashMap<String, Vec<Tag>> = HashMap::new();

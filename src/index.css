@@ -4,19 +4,11 @@
 
 html, body {
   background: transparent;
+  font-family: 'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.dark .pdf-reader .react-pdf__Page canvas,
-.dark .pdf-reader .react-pdf__Page .textLayer,
-.dark .pdf-reader .react-pdf__Page .annotationLayer {
+.dark .pdf-reader .pdf-page-img {
   filter: invert(1) hue-rotate(180deg);
-}
-
-::highlight(search-highlight) {
-  background-color: rgba(255, 213, 0, 0.4);
-}
-::highlight(search-highlight-active) {
-  background-color: rgba(255, 150, 0, 0.6);
 }

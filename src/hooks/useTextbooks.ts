@@ -10,14 +10,18 @@ export interface Textbook {
   full_path: string
 }
 
+// Module-level cache so navigating to ReaderPage doesn't re-scan the filesystem
+let cachedTextbooks: Textbook[] | null = null
+
 export function useTextbooks() {
-  const [textbooks, setTextbooks] = useState<Textbook[]>([])
-  const [loading, setLoading] = useState(true)
+  const [textbooks, setTextbooks] = useState<Textbook[]>(cachedTextbooks ?? [])
+  const [loading, setLoading] = useState(cachedTextbooks === null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
       const books = await invoke<Textbook[]>('list_textbooks')
+      cachedTextbooks = books
       setTextbooks(books)
     } catch (err) {
       console.error('Failed to list textbooks:', err)
@@ -27,7 +31,7 @@ export function useTextbooks() {
   }, [])
 
   useEffect(() => {
-    refresh()
+    if (!cachedTextbooks) refresh()
   }, [refresh])
 
   return { textbooks, loading, refresh }

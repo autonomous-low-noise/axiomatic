@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use tauri::State;
 use walkdir::WalkDir;
 
-use crate::models::{BookTagMapping, Directory, NoteRecord, Tag, Textbook};
+use crate::models::{BookTagMapping, Directory, Highlight, NoteRecord, Tag, Textbook};
 
 pub struct DbState(pub Mutex<Connection>);
 
@@ -470,3 +470,106 @@ pub fn list_book_tags_all(state: State<'_, DbState>) -> Result<Vec<BookTagMappin
         .map_err(|e| e.to_string())?;
     Ok(BookTagMapping::group_from_rows(rows))
 }
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    Command::new("xdg-open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| format!("Failed to open URL: {:?}", e))?;
+    Ok(())
+}
+
+// --- Highlights ---
+
+#[tauri::command]
+pub fn list_highlights(slug: String, state: State<'_, DbState>) -> Result<Vec<Highlight>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, slug, page, x, y, width, height, color, note, text, group_id, created_at FROM highlights WHERE slug = ? ORDER BY page, id")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([&slug], |row| {
+            Ok(Highlight {
+                id: row.get(0)?,
+                slug: row.get(1)?,
+                page: row.get(2)?,
+                x: row.get(3)?,
+                y: row.get(4)?,
+                width: row.get(5)?,
+                height: row.get(6)?,
+                color: row.get(7)?,
+                note: row.get(8)?,
+                text: row.get(9)?,
+                group_id: row.get(10)?,
+                created_at: row.get(11)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+#[tauri::command]
+pub fn create_highlight(
+    slug: String,
+    page: i64,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    color: String,
+    note: String,
+    text: String,
+    group_id: String,
+    state: State<'_, DbState>,
+) -> Result<Highlight, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO highlights (slug, page, x, y, width, height, color, note, text, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rusqlite::params![slug, page, x, y, width, height, color, note, text, group_id],
+    )
+    .map_err(|e| e.to_string())?;
+    let id = conn.last_insert_rowid();
+    let h = conn
+        .query_row(
+            "SELECT id, slug, page, x, y, width, height, color, note, text, group_id, created_at FROM highlights WHERE id = ?",
+            [id],
+            |row| {
+                Ok(Highlight {
+                    id: row.get(0)?,
+                    slug: row.get(1)?,
+                    page: row.get(2)?,
+                    x: row.get(3)?,
+                    y: row.get(4)?,
+                    width: row.get(5)?,
+                    height: row.get(6)?,
+                    color: row.get(7)?,
+                    note: row.get(8)?,
+                    text: row.get(9)?,
+                    group_id: row.get(10)?,
+                    created_at: row.get(11)?,
+                })
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(h)
+}
+
+#[tauri::command]
+pub fn delete_highlight(id: i64, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM highlights WHERE id = ?", [id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_highlight_group(group_id: String, state: State<'_, DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM highlights WHERE group_id = ?", [&group_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
