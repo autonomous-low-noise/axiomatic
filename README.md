@@ -39,6 +39,9 @@ npm run dev
 ## Roadmap
 
 
+- [ ] auto-snipper + review section with multiple modes
+- [ ] web / ios / android / windows build targets
+
 - [ ] live-watch for OS changes
 - [ ] ability to create a parallel hierarchical structure to organize the files
 - [ ] export
@@ -47,7 +50,6 @@ npm run dev
     - [ ] print pdfs together with notes? 
 - [ ] drag docs into app starts tracking them
 
-- [ ] ios / android / windows build targets
 
 
 ## License
