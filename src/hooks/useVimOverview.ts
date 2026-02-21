@@ -1,41 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-// Matches TileGrid's responsive breakpoints:
-// grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6
-function getColumns(): number {
-  const width = window.innerWidth
-  if (width >= 1280) return 6
-  if (width >= 1024) return 5
-  if (width >= 768) return 4
-  if (width >= 640) return 3
+function getColumnsFromGrid(grid: HTMLDivElement | null): number {
+  if (grid) {
+    const tracks = getComputedStyle(grid).gridTemplateColumns
+    if (tracks) return tracks.split(' ').length
+  }
   return 2
 }
 
 export function useVimOverview(
   slugs: string[],
-  _gridRef: React.RefObject<HTMLDivElement | null>,
+  gridRef: React.RefObject<HTMLDivElement | null>,
   sectionSizes: number[],
 ) {
   const [selectedIndex, setSelectedIndex] = useState(-1)
-  const columnsRef = useRef(getColumns())
   const navigate = useNavigate()
-
-  // Keep columns in sync with window width
-  useEffect(() => {
-    const onResize = () => {
-      columnsRef.current = getColumns()
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
-      const cols = columnsRef.current
+      const cols = getColumnsFromGrid(gridRef.current)
       const count = slugs.length
       if (count === 0) return
 
@@ -154,7 +141,7 @@ export function useVimOverview(
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [slugs, sectionSizes, selectedIndex, navigate])
+  }, [slugs, sectionSizes, selectedIndex, navigate, gridRef])
 
   return { selectedIndex }
 }
