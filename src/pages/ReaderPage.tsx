@@ -24,14 +24,19 @@ export function ReaderPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { textbooks, loading } = useTextbooks()
-  const { progress, update } = useProgress()
   const { getNote, setNote } = useNotes()
   const book = textbooks.find((b) => b.slug === slug)
+  const dirPaths = useMemo(() => (book ? [book.dir_path] : []), [book?.dir_path])
+  const { progress, update } = useProgress(dirPaths)
   const bookProgress = slug ? progress[slug] : undefined
+  const dirPathRef = useRef(book?.dir_path ?? '')
+  useEffect(() => {
+    if (book?.dir_path) dirPathRef.current = book.dir_path
+  }, [book?.dir_path])
 
   const { docInfo, loading: docLoading, error: docError } = useDocument(book?.full_path)
   const { colorHighlights, bookmarkHighlights, highlightsForPage, createHighlight, deleteHighlight, deleteHighlightGroup } = useHighlights(slug)
-  const { snips, addSnip } = useSnips(slug)
+  const { snips, addSnip } = useSnips(slug, book?.dir_path)
   const { tabs, openTab, reopenTab, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate } = useTabNavigation(slug)
 
   const [snipMode, setSnipMode] = useState(false)
@@ -129,8 +134,6 @@ export function ReaderPage() {
 
   const currentPageRef = useRef(currentPage)
   const totalPagesRef = useRef(totalPages)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
   // Keep totalPagesRef in sync
   useEffect(() => {
     totalPagesRef.current = totalPages
@@ -138,8 +141,8 @@ export function ReaderPage() {
 
   // Save totalPages to progress when docInfo loads
   useEffect(() => {
-    if (slug && totalPages > 0) {
-      update(slug, { totalPages })
+    if (slug && totalPages > 0 && dirPathRef.current) {
+      update(dirPathRef.current, slug, { totalPages })
     }
   }, [slug, totalPages, update])
 
@@ -249,8 +252,8 @@ export function ReaderPage() {
   }, [book, totalPages])
   useEffect(() => {
     return () => {
-      if (slug && hasLoadedRef.current) {
-        update(slug, {
+      if (slug && hasLoadedRef.current && dirPathRef.current) {
+        update(dirPathRef.current, slug, {
           currentPage: savedProgressPageRef.current ?? currentPageRef.current,
           totalPages: totalPagesRef.current,
         })
@@ -329,15 +332,12 @@ export function ReaderPage() {
       setCurrentPage(page)
       if (savedProgressPage != null) return
       currentPageRef.current = page
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => {
-        if (slug) {
-          update(slug, {
-            currentPage: page,
-            totalPages: totalPagesRef.current,
-          })
-        }
-      }, 300)
+      if (slug && dirPathRef.current) {
+        update(dirPathRef.current, slug, {
+          currentPage: page,
+          totalPages: totalPagesRef.current,
+        })
+      }
     },
     [slug, update, savedProgressPage],
   )

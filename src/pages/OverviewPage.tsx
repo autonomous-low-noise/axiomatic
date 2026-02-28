@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { useTextbooks } from '../hooks/useTextbooks'
@@ -18,6 +18,8 @@ import { togglePalette } from '../lib/palette'
 import { DirectoryExplorer } from '../components/DirectoryExplorer'
 import { TagManager } from '../components/TagManager'
 import { TagAssigner } from '../components/TagAssigner'
+import { SlugMigrationDialog } from '../components/SlugMigrationDialog'
+import type { OrphanCandidate } from '../components/SlugMigrationDialog'
 
 interface MenuState {
   x: number
@@ -28,8 +30,9 @@ interface MenuState {
 export function OverviewPage() {
   const { textbooks, loading, refresh } = useTextbooks()
   const { directories, add: addDir, remove: removeDir } = useDirectories()
-  const { progress } = useProgress()
-  const { starred, toggle } = useStarred()
+  const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
+  const { progress } = useProgress(dirPaths)
+  const { starred, toggle } = useStarred(textbooks)
   const { tags, bookTags, createTag, deleteTag, tagBook, untagBook, updateTagColor } = useTags()
   const gridRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -43,6 +46,29 @@ export function OverviewPage() {
   const [activeTagFilters, setActiveTagFilters] = useState<Set<number>>(new Set())
   const filterInputRef = useRef<HTMLInputElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
+
+  const [orphanCandidates, setOrphanCandidates] = useState<OrphanCandidate[]>([])
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false)
+  const orphanCheckDone = useRef(false)
+
+  useEffect(() => {
+    if (loading || textbooks.length === 0 || orphanCheckDone.current) return
+    orphanCheckDone.current = true
+    invoke<OrphanCandidate[]>('detect_orphaned_slugs')
+      .then((candidates) => {
+        if (candidates.length > 0) {
+          setOrphanCandidates(candidates)
+          setShowMigrationDialog(true)
+        }
+      })
+      .catch((err) => console.error('detect_orphaned_slugs failed:', err))
+  }, [loading, textbooks])
+
+  const handleMigrationComplete = useCallback(() => {
+    setShowMigrationDialog(false)
+    setOrphanCandidates([])
+    refresh()
+  }, [refresh])
 
   const matchesFilter = useCallback(
     (title: string, slug: string) => {
@@ -441,6 +467,12 @@ export function OverviewPage() {
           />
         )
       })()}
+      {showMigrationDialog && orphanCandidates.length > 0 && (
+        <SlugMigrationDialog
+          candidates={orphanCandidates}
+          onComplete={handleMigrationComplete}
+        />
+      )}
     </div>
   )
 }

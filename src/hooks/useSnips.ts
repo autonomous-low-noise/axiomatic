@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface Snip {
-  id: number
+  id: string
   slug: string
   full_path: string
   page: number
@@ -14,37 +14,31 @@ export interface Snip {
   created_at: string
 }
 
-function loadXp(slug: string): number {
-  try {
-    return Number(localStorage.getItem(`snipXp:${slug}`)) || 0
-  } catch {
-    return 0
-  }
-}
-
-function saveXp(slug: string, xp: number) {
-  localStorage.setItem(`snipXp:${slug}`, String(xp))
-}
-
-export function useSnips(slug: string | undefined) {
+export function useSnips(slug: string | undefined, dirPath: string | undefined) {
   const [snips, setSnips] = useState<Snip[]>([])
-  const [xp, setXp] = useState(() => (slug ? loadXp(slug) : 0))
+  const [xp, setXp] = useState(0)
 
   useEffect(() => {
-    if (!slug) return
+    if (!slug || !dirPath) return
     let cancelled = false
-    invoke<Snip[]>('list_snips', { slug })
+    invoke<Snip[]>('list_snips', { dirPath, slug })
       .then((result) => {
         if (!cancelled) {
           setSnips(result)
-          setXp(loadXp(slug))
         }
       })
       .catch((err) => console.error('list_snips failed:', err))
+
+    invoke<number>('get_xp', { dirPath, slug })
+      .then((val) => {
+        if (!cancelled) setXp(val)
+      })
+      .catch((err) => console.error('get_xp failed:', err))
+
     return () => {
       cancelled = true
     }
-  }, [slug])
+  }, [slug, dirPath])
 
   const addSnip = useCallback(
     async (
@@ -56,8 +50,9 @@ export function useSnips(slug: string | undefined) {
       width: number,
       height: number,
     ) => {
-      if (!slug) return
+      if (!slug || !dirPath) return
       const snip = await invoke<Snip>('create_snip', {
+        dirPath,
         slug,
         fullPath,
         page,
@@ -70,22 +65,26 @@ export function useSnips(slug: string | undefined) {
       setSnips((prev) => [...prev, snip])
       return snip
     },
-    [slug],
+    [slug, dirPath],
   )
 
-  const removeSnip = useCallback(async (id: number) => {
-    await invoke('delete_snip', { id })
+  const removeSnip = useCallback(async (id: string) => {
+    if (!dirPath) return
+    await invoke('delete_snip', { dirPath, id })
     setSnips((prev) => prev.filter((s) => s.id !== id))
-  }, [])
+  }, [dirPath])
 
-  const incrementXp = useCallback(() => {
-    if (!slug) return 0
-    const current = loadXp(slug)
-    const next = current + 1
-    saveXp(slug, next)
-    setXp(next)
-    return next
-  }, [slug])
+  const incrementXp = useCallback(async () => {
+    if (!slug || !dirPath) return 0
+    try {
+      const newVal = await invoke<number>('increment_xp', { dirPath, slug })
+      setXp(newVal)
+      return newVal
+    } catch (err) {
+      console.error('increment_xp failed:', err)
+      return xp
+    }
+  }, [slug, dirPath, xp])
 
   return { snips, xp, addSnip, removeSnip, incrementXp }
 }

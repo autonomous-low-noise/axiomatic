@@ -1,34 +1,33 @@
+import { invoke } from '@tauri-apps/api/core'
 import type { BookProgress, ProgressMap } from '../types/progress'
 
-const STORAGE_KEY = 'axiomatic:progress'
-
-export function loadProgress(): ProgressMap {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as ProgressMap) : {}
-  } catch {
-    return {}
+export async function loadAllProgress(dirPaths: string[]): Promise<ProgressMap> {
+  const maps = await Promise.all(
+    dirPaths.map((dirPath) =>
+      invoke<ProgressMap>('get_all_progress', { dirPath }).catch(() => ({} as ProgressMap)),
+    ),
+  )
+  const merged: ProgressMap = {}
+  for (const map of maps) {
+    for (const [slug, progress] of Object.entries(map)) {
+      merged[slug] = progress
+    }
   }
+  return merged
 }
 
-export function saveProgress(map: ProgressMap): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
-}
-
-export function getBookProgress(slug: string): BookProgress | undefined {
-  return loadProgress()[slug]
-}
-
-export function updateBookProgress(
+export async function saveBookProgress(
+  dirPath: string,
   slug: string,
   patch: Partial<BookProgress>,
-): void {
-  const map = loadProgress()
-  const existing = map[slug] ?? { currentPage: 1, totalPages: 0, lastReadAt: '' }
-  map[slug] = {
+  currentMap: ProgressMap,
+): Promise<BookProgress> {
+  const existing = currentMap[slug] ?? { currentPage: 1, totalPages: 0, lastReadAt: '' }
+  const updated: BookProgress = {
     ...existing,
     ...patch,
     lastReadAt: new Date().toISOString(),
   }
-  saveProgress(map)
+  await invoke('save_progress', { dirPath, slug, progress: updated })
+  return updated
 }

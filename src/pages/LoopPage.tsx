@@ -14,7 +14,7 @@ export function LoopPage() {
 
   const { textbooks, loading } = useTextbooks()
   const book = textbooks.find((b) => b.slug === slug)
-  const { snips, xp, incrementXp } = useSnips(slug)
+  const { snips, xp, incrementXp } = useSnips(slug, book?.dir_path)
   const tabSlug = useMemo(() => `loop:${slug}`, [slug])
   const { tabs, openTab, closeTabAndNavigate, closeOtherTabsAndNavigate, selectTab } = useTabNavigation(tabSlug)
 

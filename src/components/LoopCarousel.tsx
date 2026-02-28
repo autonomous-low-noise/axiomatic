@@ -4,7 +4,7 @@ import type { Snip } from '../hooks/useSnips'
 interface LoopCarouselProps {
   snips: Snip[]
   xp: number
-  onIncrementXp: () => number
+  onIncrementXp: () => Promise<number>
   onExit: () => void
   shuffled: boolean
 }
@@ -77,8 +77,8 @@ export function LoopCarousel({
     setRevealed(true)
   }, [revealed])
 
-  const advance = useCallback(() => {
-    const newXp = onIncrementXp()
+  const advance = useCallback(async () => {
+    const newXp = await onIncrementXp()
     if (newXp != null) setDisplayXp(newXp)
   }, [onIncrementXp])
 

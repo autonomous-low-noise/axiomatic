@@ -60,7 +60,7 @@ pub struct Highlight {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Snip {
-    pub id: i64,
+    pub id: String,
     pub slug: String,
     pub full_path: String,
     pub page: i64,
@@ -70,6 +70,22 @@ pub struct Snip {
     pub width: f64,
     pub height: f64,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookProgress {
+    pub current_page: i64,
+    pub total_pages: i64,
+    pub last_read_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrphanCandidate {
+    pub old_slug: String,
+    pub new_slug_candidate: String,
+    pub dir_path: String,
+    pub evidence: Vec<String>,
 }
 
 impl BookTagMapping {
