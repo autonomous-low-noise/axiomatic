@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../__mocks__/@tauri-apps/api/core'
+import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../../__mocks__/@tauri-apps/api/core'
 
 vi.mock('@tauri-apps/api/core')
 
@@ -18,6 +18,7 @@ const sampleSnip: Snip = {
   width: 0.5,
   height: 0.3,
   created_at: '2024-01-01T00:00:00Z',
+  tags: [],
 }
 
 beforeEach(() => {

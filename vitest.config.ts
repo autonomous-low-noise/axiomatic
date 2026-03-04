@@ -8,6 +8,6 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
-    mockReset: true,
+    mockClear: true,
   },
 })

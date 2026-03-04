@@ -16,6 +16,7 @@ function makeSnip(overrides: Partial<Snip> = {}): Snip {
     width: 0.5,
     height: 0.3,
     created_at: '2024-01-01T00:00:00Z',
+    tags: [],
     ...overrides,
   }
 }

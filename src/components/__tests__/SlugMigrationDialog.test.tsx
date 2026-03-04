@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../__mocks__/@tauri-apps/api/core'
+import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../../__mocks__/@tauri-apps/api/core'
 
 vi.mock('@tauri-apps/api/core')
 

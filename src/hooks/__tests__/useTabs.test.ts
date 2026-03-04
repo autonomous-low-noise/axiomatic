@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
 import type { OpenTab } from '../useTabs'
+import { useTabs } from '../useTabs'
 
 const STORAGE_KEY = 'axiomatic:tabs'
 
@@ -14,17 +15,22 @@ function makeTab(slug: string): OpenTab {
   }
 }
 
-// We need to clear localStorage and re-import useTabs fresh for each test
-// because the module has a module-level store and closedTabsStack
-let useTabs: typeof import('../useTabs').useTabs
-
-beforeEach(async () => {
+/**
+ * Clear localStorage and force the module-level store to re-read by
+ * dispatching a synthetic 'storage' event. This is needed because
+ * createLocalStorageStore only refreshes on storage events or explicit
+ * emitChange() calls.
+ */
+function resetTabsState() {
   localStorage.clear()
-  // Dynamic re-import to reset module-level state
-  // Note: vitest module cache may prevent true reset, but localStorage clear
-  // resets the external state the store reads from
-  const mod = await import('../useTabs')
-  useTabs = mod.useTabs
+  // Dispatch a storage event so the module-level store picks up the cleared state
+  window.dispatchEvent(
+    new StorageEvent('storage', { key: STORAGE_KEY, newValue: null }),
+  )
+}
+
+beforeEach(() => {
+  resetTabsState()
 })
 
 describe('useTabs', () => {
@@ -134,9 +140,19 @@ describe('useTabs', () => {
     expect(result.current.activeSlug).toBe('book_b')
   })
 
-  it('reopenTab returns null when no closed tabs exist', () => {
+  it('reopenTab returns null when reopen stack is exhausted', () => {
     const { result } = renderHook(() => useTabs())
 
+    // Drain any entries remaining on the module-level closedTabsStack
+    // from previous tests by calling reopenTab until null
+    let drained: OpenTab | null = { slug: '', title: '', fullPath: '', route: '' }
+    while (drained !== null) {
+      act(() => {
+        drained = result.current.reopenTab()
+      })
+    }
+
+    // Now the stack is truly empty; reopenTab should return null
     let reopened: OpenTab | null = null
     act(() => {
       reopened = result.current.reopenTab()

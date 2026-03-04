@@ -820,16 +820,8 @@ fn collect_db_slugs(conn: &Connection) -> Result<HashMap<String, Vec<String>>, S
         slug_evidence.entry(slug).or_default().push("book_tags".into());
     }
 
-    // snips
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT slug FROM snips")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for slug in rows.flatten() {
-        slug_evidence.entry(slug).or_default().push("snips".into());
-    }
+    // Note: snips are stored in .axiomatic/snips.json, not SQLite.
+    // The snips table was dropped in migration 3.
 
     Ok(slug_evidence)
 }

@@ -52,8 +52,6 @@ describe('BookTile', () => {
   })
 
   it('memo comparator prevents re-render when progress values are identical', () => {
-    const renderCount = { value: 0 }
-
     // We can test the comparator directly by rendering and rerendering
     const progress1: BookProgress = { currentPage: 10, totalPages: 100, lastReadAt: '2024-01-01' }
     const progress2: BookProgress = { currentPage: 10, totalPages: 100, lastReadAt: '2024-01-02' }

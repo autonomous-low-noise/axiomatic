@@ -1,18 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../__mocks__/@tauri-apps/api/core'
+import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../../__mocks__/@tauri-apps/api/core'
 
 vi.mock('@tauri-apps/api/core')
 
-import { useProgress } from '../useProgress'
-
 beforeEach(() => {
   resetMockInvoke()
-  vi.useFakeTimers()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('useProgress', () => {
@@ -28,6 +21,7 @@ describe('useProgress', () => {
       return {}
     })
 
+    const { useProgress } = await import('../useProgress')
     const { result } = renderHook(() => useProgress(['/dir1', '/dir2']))
 
     await waitFor(() => {
@@ -47,8 +41,10 @@ describe('useProgress', () => {
   })
 
   it('debounces save_progress calls at 300ms', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     mockInvoke('get_all_progress', {})
 
+    const { useProgress } = await import('../useProgress')
     const { result } = renderHook(() => useProgress(['/mydir']))
 
     await waitFor(() => {
@@ -82,12 +78,19 @@ describe('useProgress', () => {
     // The progress should reflect the latest update (page 4)
     const savedProgress = callsAfter[0].args?.progress as { currentPage: number }
     expect(savedProgress.currentPage).toBe(4)
+
+    vi.useRealTimers()
   })
 
-  it('optimistically updates local state before debounce fires', () => {
+  it('optimistically updates local state before debounce fires', async () => {
     mockInvoke('get_all_progress', {})
 
+    const { useProgress } = await import('../useProgress')
     const { result } = renderHook(() => useProgress(['/mydir']))
+
+    await waitFor(() => {
+      expect(result.current.progress).toBeDefined()
+    })
 
     act(() => {
       result.current.update('/mydir', 'book_z', { currentPage: 7, totalPages: 50 })
@@ -98,7 +101,8 @@ describe('useProgress', () => {
     expect(result.current.progress['book_z']?.totalPages).toBe(50)
   })
 
-  it('returns empty progress when no dirPaths are provided', () => {
+  it('returns empty progress when no dirPaths are provided', async () => {
+    const { useProgress } = await import('../useProgress')
     const { result } = renderHook(() => useProgress([]))
     expect(result.current.progress).toEqual({})
   })

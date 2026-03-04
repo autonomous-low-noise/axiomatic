@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import type { Directory } from './useDirectories'
 
 export interface Snip {
   id: string
@@ -88,4 +89,65 @@ export function useSnips(slug: string | undefined, dirPath: string | undefined) 
   }, [slug, dirPath, xp])
 
   return { snips, xp, addSnip, removeSnip, incrementXp }
+}
+
+/** Snip enriched with its source directory path for IPC calls. */
+export interface SnipWithDir extends Snip {
+  dirPath: string
+  dirLabel: string
+}
+
+/**
+ * Load all snips across all attached library directories.
+ * Calls `list_all_snips` for each directory and merges the results.
+ */
+export function useAllSnips(directories: Directory[]) {
+  const [snips, setSnips] = useState<SnipWithDir[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const results = await Promise.all(
+        directories.map(async (dir) => {
+          const dirSnips = await invoke<Snip[]>('list_all_snips', { dirPath: dir.path })
+          return dirSnips.map((s) => ({ ...s, dirPath: dir.path, dirLabel: dir.label }))
+        }),
+      )
+      setSnips(results.flat())
+    } catch (err) {
+      console.error('useAllSnips failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [directories])
+
+  useEffect(() => {
+    if (directories.length === 0) {
+      setSnips([])
+      setLoading(false)
+      return
+    }
+    refresh()
+  }, [directories, refresh])
+
+  const addTag = useCallback(async (dirPath: string, snipId: string, tag: string) => {
+    await invoke('add_snip_tag', { dirPath, snipId, tag })
+    setSnips((prev) =>
+      prev.map((s) =>
+        s.id === snipId ? { ...s, tags: s.tags.includes(tag) ? s.tags : [...s.tags, tag] } : s,
+      ),
+    )
+  }, [])
+
+  const removeTag = useCallback(async (dirPath: string, snipId: string, tag: string) => {
+    await invoke('remove_snip_tag', { dirPath, snipId, tag })
+    setSnips((prev) =>
+      prev.map((s) =>
+        s.id === snipId ? { ...s, tags: s.tags.filter((t) => t !== tag) } : s,
+      ),
+    )
+  }, [])
+
+  return { snips, loading, refresh, addTag, removeTag }
 }

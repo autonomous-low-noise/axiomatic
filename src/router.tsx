@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { OverviewPage } from './pages/OverviewPage'
 import { ReaderPage } from './pages/ReaderPage'
 import { LoopPage } from './pages/LoopPage'
+import { SnipsPage } from './pages/SnipsPage'
 import { Titlebar } from './components/Titlebar'
 import { CommandPalette, type Command } from './components/CommandPalette'
 import { useTheme, setTheme } from './hooks/useTheme'
@@ -57,6 +58,11 @@ function Layout() {
         id: 'theme-toggle',
         label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode',
         action: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
+      },
+      {
+        id: 'snips-page',
+        label: 'Snips',
+        action: () => navigate('/snips'),
       },
     ]
 
@@ -162,6 +168,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <OverviewPage /> },
       { path: '/read/:slug', element: <ReaderPage /> },
       { path: '/loop/:slug', element: <LoopPage /> },
+      { path: '/snips', element: <SnipsPage /> },
     ],
   },
 ])
