@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { EditorView } from '@codemirror/view'
 import { useTextbooks } from '../hooks/useTextbooks'
@@ -15,10 +15,31 @@ import { TabBar } from '../components/TabBar'
 import { ReaderToolbar } from '../components/ReaderToolbar'
 import { NotesPanel } from '../components/NotesPanel'
 import { OutlineSidebar } from '../components/OutlineSidebar'
-import { HighlightsPanel } from '../components/HighlightsPanel'
-import { BookmarksPanel } from '../components/BookmarksPanel'
+import { AnnotationPanel } from '../components/AnnotationPanel'
 import { SnipBanner } from '../components/SnipBanner'
 import { setReaderSnipMode, setReaderHasSnips, setReaderZenMode, setReaderLearningTools } from '../lib/readerState'
+import { clampPanelWidths } from '../lib/layout'
+
+function makeResizeHandler(
+  setter: (w: number) => void,
+  min: number,
+  max: number,
+  side: 'left' | 'right',
+) {
+  return (e: React.MouseEvent) => {
+    e.preventDefault()
+    const onMouseMove = (ev: globalThis.MouseEvent) => {
+      const raw = side === 'left' ? ev.clientX : window.innerWidth - ev.clientX
+      setter(Math.min(max, Math.max(min, raw)))
+    }
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+}
 
 export function ReaderPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -89,6 +110,26 @@ export function ReaderPage() {
   const scrollSeq = useRef(0)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView | null>(null)
+
+  // Clamp panel widths on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth
+      const panels: Record<string, number> = {}
+      if (outlineOpen) panels.outline = outlinePaneWidth
+      if (notesOpen) panels.notes = notesPaneWidth
+      if (highlightsOpen) panels.highlights = highlightsPaneWidth
+      if (bookmarksOpen) panels.bookmarks = bookmarksPaneWidth
+
+      const clamped = clampPanelWidths(w, panels)
+      if (clamped.outline !== undefined && clamped.outline !== outlinePaneWidth) setOutlinePaneWidth(clamped.outline)
+      if (clamped.notes !== undefined && clamped.notes !== notesPaneWidth) setNotesPaneWidth(clamped.notes)
+      if (clamped.highlights !== undefined && clamped.highlights !== highlightsPaneWidth) setHighlightsPaneWidth(clamped.highlights)
+      if (clamped.bookmarks !== undefined && clamped.bookmarks !== bookmarksPaneWidth) setBookmarksPaneWidth(clamped.bookmarks)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [outlineOpen, notesOpen, highlightsOpen, bookmarksOpen, outlinePaneWidth, notesPaneWidth, highlightsPaneWidth, bookmarksPaneWidth])
 
   const zoomDisplayTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const snipToastTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -268,61 +309,10 @@ export function ReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  const handleOutlineResizeMouseDown = useCallback((e: ReactMouseEvent) => {
-    e.preventDefault()
-    const onMouseMove = (ev: globalThis.MouseEvent) => {
-      const newWidth = Math.min(500, Math.max(120, ev.clientX))
-      setOutlinePaneWidth(newWidth)
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [])
-
-  const handleResizeMouseDown = useCallback((e: ReactMouseEvent) => {
-    e.preventDefault()
-    const onMouseMove = (ev: globalThis.MouseEvent) => {
-      const newWidth = Math.min(800, Math.max(240, window.innerWidth - ev.clientX))
-      setNotesPaneWidth(newWidth)
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [])
-
-  const handleHighlightsResizeMouseDown = useCallback((e: ReactMouseEvent) => {
-    e.preventDefault()
-    const onMouseMove = (ev: globalThis.MouseEvent) => {
-      const newWidth = Math.min(500, Math.max(180, window.innerWidth - ev.clientX))
-      setHighlightsPaneWidth(newWidth)
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [])
-
-  const handleBookmarksResizeMouseDown = useCallback((e: ReactMouseEvent) => {
-    e.preventDefault()
-    const onMouseMove = (ev: globalThis.MouseEvent) => {
-      const newWidth = Math.min(500, Math.max(180, window.innerWidth - ev.clientX))
-      setBookmarksPaneWidth(newWidth)
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }, [])
+  const handleOutlineResize = useMemo(() => makeResizeHandler(setOutlinePaneWidth, 120, 500, 'left'), [])
+  const handleNotesResize = useMemo(() => makeResizeHandler(setNotesPaneWidth, 240, 800, 'right'), [])
+  const handleHighlightsResize = useMemo(() => makeResizeHandler(setHighlightsPaneWidth, 180, 500, 'right'), [])
+  const handleBookmarksResize = useMemo(() => makeResizeHandler(setBookmarksPaneWidth, 180, 500, 'right'), [])
 
   const handlePaneNavigate = useCallback(
     (page: number) => {
@@ -455,7 +445,7 @@ export function ReaderPage() {
             </div>
             <div
               className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
-              onMouseDown={handleOutlineResizeMouseDown}
+              onMouseDown={handleOutlineResize}
             />
           </>
         )}
@@ -497,7 +487,7 @@ export function ReaderPage() {
           <>
             <div
               className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
-              onMouseDown={handleResizeMouseDown}
+              onMouseDown={handleNotesResize}
             />
             <div className={`flex h-full min-h-0 flex-col ${activePane === 'notes' ? 'border-t-2 border-[#268bd2]' : 'border-t-2 border-[#eee8d5] dark:border-[#073642]'}`}>
               <NotesPanel
@@ -515,11 +505,12 @@ export function ReaderPage() {
           <>
             <div
               className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
-              onMouseDown={handleBookmarksResizeMouseDown}
+              onMouseDown={handleBookmarksResize}
             />
             <div className="flex h-full min-h-0 flex-col border-t-2 border-[#eee8d5] dark:border-[#073642]">
-              <BookmarksPanel
-                bookmarks={bookmarkHighlights}
+              <AnnotationPanel
+                items={bookmarkHighlights}
+                variant="bookmarks"
                 width={bookmarksPaneWidth}
                 onNavigate={handlePaneNavigate}
                 onDeleteHighlight={deleteHighlight}
@@ -532,11 +523,12 @@ export function ReaderPage() {
           <>
             <div
               className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
-              onMouseDown={handleHighlightsResizeMouseDown}
+              onMouseDown={handleHighlightsResize}
             />
             <div className="flex h-full min-h-0 flex-col border-t-2 border-[#eee8d5] dark:border-[#073642]">
-              <HighlightsPanel
-                highlights={colorHighlights}
+              <AnnotationPanel
+                items={colorHighlights}
+                variant="highlights"
                 width={highlightsPaneWidth}
                 onNavigate={handlePaneNavigate}
                 onDeleteHighlight={deleteHighlight}

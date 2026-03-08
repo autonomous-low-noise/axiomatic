@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::commands::DbState;
+use crate::commands::{get_db, DbState};
 use crate::models::Highlight;
 
 fn row_to_highlight(row: &rusqlite::Row) -> rusqlite::Result<Highlight> {
@@ -40,7 +40,7 @@ pub fn list_highlights_inner(conn: &Connection, slug: &str) -> Result<Vec<Highli
 
 #[tauri::command]
 pub fn list_highlights(slug: String, state: State<'_, DbState>) -> Result<Vec<Highlight>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     list_highlights_inner(&conn, &slug)
 }
 
@@ -85,7 +85,7 @@ pub fn create_highlight(
     group_id: String,
     state: State<'_, DbState>,
 ) -> Result<Highlight, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     create_highlight_inner(&conn, &slug, page, x, y, width, height, &color, &note, &text, &group_id)
 }
 
@@ -97,7 +97,7 @@ pub fn delete_highlight_inner(conn: &Connection, id: i64) -> Result<(), String> 
 
 #[tauri::command]
 pub fn delete_highlight(id: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     delete_highlight_inner(&conn, id)
 }
 
@@ -109,7 +109,7 @@ pub fn delete_highlight_group_inner(conn: &Connection, group_id: &str) -> Result
 
 #[tauri::command]
 pub fn delete_highlight_group(group_id: String, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     delete_highlight_group_inner(&conn, &group_id)
 }
 

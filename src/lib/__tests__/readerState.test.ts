@@ -4,6 +4,8 @@ import {
   setReaderHasSnips,
   setReaderZenMode,
   setReaderLearningTools,
+  getReaderSnipMode,
+  getReaderHasSnips,
   getReaderStateSnapshot,
   subscribeReaderState,
 } from '../readerState'
@@ -60,5 +62,37 @@ describe('readerState', () => {
   it('setReaderLearningTools updates snapshot', () => {
     setReaderLearningTools(true)
     expect(getReaderStateSnapshot().learningTools).toBe(true)
+  })
+
+  it('setReaderSnipMode updates snapshot', () => {
+    setReaderSnipMode(true)
+    expect(getReaderStateSnapshot().snipMode).toBe(true)
+  })
+
+  it('setReaderHasSnips updates snapshot', () => {
+    setReaderHasSnips(true)
+    expect(getReaderStateSnapshot().hasSnips).toBe(true)
+  })
+
+  it('getReaderSnipMode returns current snipMode', () => {
+    expect(getReaderSnipMode()).toBe(false)
+    setReaderSnipMode(true)
+    expect(getReaderSnipMode()).toBe(true)
+  })
+
+  it('getReaderHasSnips returns current hasSnips', () => {
+    expect(getReaderHasSnips()).toBe(false)
+    setReaderHasSnips(true)
+    expect(getReaderHasSnips()).toBe(true)
+  })
+
+  it('unsubscribe stops notifications', () => {
+    let count = 0
+    const unsub = subscribeReaderState(() => { count++ })
+    setReaderSnipMode(true)
+    expect(count).toBe(1)
+    unsub()
+    setReaderSnipMode(false)
+    expect(count).toBe(1)
   })
 })

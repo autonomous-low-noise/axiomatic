@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { DocumentInfo } from '../hooks/useDocument'
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onNavigate: (page: number) => void
 }
 
-function PageTile({
+const PageTile = memo(function PageTile({
   pageNum,
   fullPath,
   aspectRatio,
@@ -79,7 +79,7 @@ function PageTile({
       </span>
     </button>
   )
-}
+})
 
 export function OutlineSidebar({ docInfo, fullPath, currentPage, onNavigate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)

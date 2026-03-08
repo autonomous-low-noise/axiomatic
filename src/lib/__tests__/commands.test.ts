@@ -1,8 +1,15 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../hooks/useTheme', () => ({ setTheme: vi.fn() }))
 
+import { setTheme } from '../../hooks/useTheme'
 import { buildCommands } from '../commands'
+
+const mockedSetTheme = vi.mocked(setTheme)
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('buildCommands', () => {
   it('returns theme commands on non-reader pages', () => {
@@ -45,5 +52,52 @@ describe('buildCommands', () => {
   it('shows correct theme toggle label per mode', () => {
     expect(buildCommands(false, 'dark').find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to light mode')
     expect(buildCommands(false, 'light').find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to dark mode')
+  })
+
+  it('theme-system action calls setTheme("system")', () => {
+    const cmds = buildCommands(false, 'light')
+    cmds.find((c) => c.id === 'theme-system')!.action()
+    expect(mockedSetTheme).toHaveBeenCalledWith('system')
+  })
+
+  it('theme-toggle action toggles theme correctly', () => {
+    buildCommands(false, 'dark').find((c) => c.id === 'theme-toggle')!.action()
+    expect(mockedSetTheme).toHaveBeenCalledWith('light')
+
+    mockedSetTheme.mockClear()
+    buildCommands(false, 'light').find((c) => c.id === 'theme-toggle')!.action()
+    expect(mockedSetTheme).toHaveBeenCalledWith('dark')
+  })
+
+  it('reader commands dispatch CustomEvents on window', () => {
+    const events: string[] = []
+    const listener = (e: Event) => events.push(e.type)
+
+    const eventNames = [
+      'axiomatic:toggle-outline',
+      'axiomatic:toggle-notes',
+      'axiomatic:toggle-bookmarks',
+      'axiomatic:toggle-highlights',
+      'axiomatic:toggle-zen',
+      'axiomatic:toggle-learning-tools',
+    ]
+    for (const name of eventNames) window.addEventListener(name, listener)
+
+    const cmds = buildCommands(true, 'light')
+    const readerIds = ['toggle-outline', 'toggle-notes', 'toggle-bookmarks', 'toggle-highlights', 'toggle-zen', 'toggle-learning-tools']
+    for (const id of readerIds) {
+      cmds.find((c) => c.id === id)!.action()
+    }
+
+    expect(events).toEqual(eventNames)
+
+    for (const name of eventNames) window.removeEventListener(name, listener)
+  })
+
+  it('all commands have non-empty labels', () => {
+    const cmds = buildCommands(true, 'dark')
+    for (const cmd of cmds) {
+      expect(cmd.label.length).toBeGreaterThan(0)
+    }
   })
 })

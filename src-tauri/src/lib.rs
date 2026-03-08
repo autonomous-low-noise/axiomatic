@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod highlight_commands;
+mod json_storage;
 mod models;
 mod pdf_commands;
 mod pdf_engine;

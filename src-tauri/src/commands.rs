@@ -12,6 +12,11 @@ use crate::models::{BookProgress, BookTagMapping, Directory, NoteRecord, OrphanC
 pub struct DbState(pub Mutex<Connection>);
 pub struct PendingFile(pub Mutex<Option<String>>);
 
+/// Lock the database connection, converting poison errors to String.
+pub fn get_db<'a>(state: &'a State<'a, DbState>) -> Result<std::sync::MutexGuard<'a, Connection>, String> {
+    state.0.lock().map_err(|e| e.to_string())
+}
+
 fn sanitize_slug(name: &str) -> String {
     name.to_lowercase()
         .replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "-")
@@ -53,7 +58,7 @@ fn row_to_note(row: &rusqlite::Row) -> rusqlite::Result<NoteRecord> {
     })
 }
 
-fn query_all_directories(conn: &Connection) -> Result<Vec<Directory>, String> {
+pub fn list_directories_inner(conn: &Connection) -> Result<Vec<Directory>, String> {
     let mut stmt = conn
         .prepare("SELECT id, path, label, added_at FROM directories ORDER BY added_at")
         .map_err(|e| e.to_string())?;
@@ -65,13 +70,9 @@ fn query_all_directories(conn: &Connection) -> Result<Vec<Directory>, String> {
     Ok(dirs)
 }
 
-pub fn list_directories_inner(conn: &Connection) -> Result<Vec<Directory>, String> {
-    query_all_directories(conn)
-}
-
 #[tauri::command]
 pub fn list_directories(state: State<'_, DbState>) -> Result<Vec<Directory>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     list_directories_inner(&conn)
 }
 
@@ -106,7 +107,7 @@ pub fn add_directory(path: String, state: State<'_, DbState>) -> Result<Director
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| path.clone());
 
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     let dir = add_directory_inner(&conn, &path, &label)?;
 
     // Auto-create .axiomatic/ project state directory
@@ -123,66 +124,52 @@ pub fn remove_directory_inner(conn: &Connection, id: i64) -> Result<(), String> 
 
 #[tauri::command]
 pub fn remove_directory(id: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     remove_directory_inner(&conn, id)
+}
+
+/// Scan directories for PDF files and return textbook metadata.
+fn scan_textbooks(dirs: &[Directory]) -> Vec<Textbook> {
+    let mut textbooks = Vec::new();
+    for dir in dirs {
+        let dir_path = Path::new(&dir.path);
+        if !dir_path.is_dir() {
+            continue;
+        }
+        for entry in WalkDir::new(dir_path)
+            .into_iter()
+            .filter_entry(|e| e.file_name().to_str().map(|s| s != ".axiomatic").unwrap_or(true))
+            .flatten()
+        {
+            let path = entry.path();
+            if path.is_file()
+                && path.extension().map(|e| e.to_ascii_lowercase() == "pdf").unwrap_or(false)
+            {
+                let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let stem = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                textbooks.push(Textbook {
+                    slug: format!("{}_{}", dir.id, sanitize_slug(&stem)),
+                    title: title_from_stem(&stem),
+                    file: file_name,
+                    dir_id: dir.id,
+                    dir_path: dir.path.clone(),
+                    full_path: path.to_string_lossy().to_string(),
+                });
+            }
+        }
+    }
+    textbooks
 }
 
 #[tauri::command]
 pub async fn list_textbooks(state: State<'_, DbState>) -> Result<Vec<Textbook>, String> {
     let dirs = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
-        query_all_directories(&conn)?
+        let conn = get_db(&state)?;
+        list_directories_inner(&conn)?
     };
-
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut textbooks = Vec::new();
-        for dir in &dirs {
-            let dir_path = Path::new(&dir.path);
-            if !dir_path.is_dir() {
-                continue;
-            }
-            for entry in WalkDir::new(dir_path)
-                .into_iter()
-                .filter_entry(|e| {
-                    e.file_name().to_str().map(|s| s != ".axiomatic").unwrap_or(true)
-                })
-                .flatten()
-            {
-                let path = entry.path();
-                if path.is_file()
-                    && path
-                        .extension()
-                        .map(|e| e.to_ascii_lowercase() == "pdf")
-                        .unwrap_or(false)
-                {
-                    let file_name = path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let stem = path
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let slug = format!("{}_{}", dir.id, sanitize_slug(&stem));
-                    let title = title_from_stem(&stem);
-                    let full_path = path.to_string_lossy().to_string();
-                    textbooks.push(Textbook {
-                        slug,
-                        title,
-                        file: file_name,
-                        dir_id: dir.id,
-                        dir_path: dir.path.clone(),
-                        full_path,
-                    });
-                }
-            }
-        }
-        Ok(textbooks)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || Ok(scan_textbooks(&dirs)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -283,7 +270,7 @@ pub fn get_note_inner(conn: &Connection, slug: &str, page: i64) -> Result<Option
 
 #[tauri::command]
 pub fn get_note(slug: String, page: i64, state: State<'_, DbState>) -> Result<Option<NoteRecord>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     get_note_inner(&conn, &slug, page)
 }
 
@@ -306,7 +293,7 @@ pub fn set_note_inner(conn: &Connection, slug: &str, page: i64, content: &str, f
 
 #[tauri::command]
 pub fn set_note(slug: String, page: i64, content: String, format: String, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     set_note_inner(&conn, &slug, page, &content, &format)
 }
 
@@ -324,7 +311,7 @@ pub fn list_notes_for_book_inner(conn: &Connection, slug: &str) -> Result<Vec<No
 
 #[tauri::command]
 pub fn list_notes_for_book(slug: String, state: State<'_, DbState>) -> Result<Vec<NoteRecord>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     list_notes_for_book_inner(&conn, &slug)
 }
 
@@ -338,7 +325,7 @@ pub fn delete_note_inner(conn: &Connection, slug: &str, page: i64) -> Result<(),
 
 #[tauri::command]
 pub fn delete_note(slug: String, page: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     delete_note_inner(&conn, &slug, page)
 }
 
@@ -354,7 +341,7 @@ pub fn save_note_image_inner(conn: &Connection, slug: &str, page: i64, filename:
 
 #[tauri::command]
 pub fn save_note_image(slug: String, page: i64, filename: String, data: Vec<u8>, state: State<'_, DbState>) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     save_note_image_inner(&conn, &slug, page, &filename, &data)
 }
 
@@ -371,14 +358,14 @@ pub fn get_note_image_inner(conn: &Connection, id: i64) -> Result<Vec<u8>, Strin
 
 #[tauri::command]
 pub fn get_note_image(id: i64, state: State<'_, DbState>) -> Result<tauri::ipc::Response, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     let data = get_note_image_inner(&conn, id)?;
     Ok(tauri::ipc::Response::new(data))
 }
 
 #[tauri::command]
 pub fn export_notes_for_book(slug: String, state: State<'_, DbState>) -> Result<String, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     let mut stmt = conn
         .prepare("SELECT page, content FROM notes WHERE slug = ?1 ORDER BY page")
         .map_err(|e| e.to_string())?;
@@ -401,7 +388,7 @@ pub fn export_notes_for_book(slug: String, state: State<'_, DbState>) -> Result<
 pub fn migrate_notes_from_json(json_data: String, state: State<'_, DbState>) -> Result<i64, String> {
     let map: std::collections::HashMap<String, String> =
         serde_json::from_str(&json_data).map_err(|e| e.to_string())?;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     let mut count: i64 = 0;
     for (key, content) in &map {
         let parts: Vec<&str> = key.rsplitn(2, ':').collect();
@@ -448,7 +435,7 @@ pub fn list_tags_inner(conn: &Connection) -> Result<Vec<Tag>, String> {
 
 #[tauri::command]
 pub fn list_tags(state: State<'_, DbState>) -> Result<Vec<Tag>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     list_tags_inner(&conn)
 }
 
@@ -464,7 +451,7 @@ pub fn create_tag_inner(conn: &Connection, name: &str, color: &str) -> Result<Ta
 
 #[tauri::command]
 pub fn create_tag(name: String, color: String, state: State<'_, DbState>) -> Result<Tag, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     create_tag_inner(&conn, &name, &color)
 }
 
@@ -478,7 +465,7 @@ pub fn delete_tag_inner(conn: &Connection, id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_tag(id: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     delete_tag_inner(&conn, id)
 }
 
@@ -493,7 +480,7 @@ pub fn update_tag_color_inner(conn: &Connection, id: i64, color: &str) -> Result
 
 #[tauri::command]
 pub fn update_tag_color(id: i64, color: String, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     update_tag_color_inner(&conn, id, &color)
 }
 
@@ -508,7 +495,7 @@ pub fn tag_book_inner(conn: &Connection, book_slug: &str, tag_id: i64) -> Result
 
 #[tauri::command]
 pub fn tag_book(book_slug: String, tag_id: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     tag_book_inner(&conn, &book_slug, tag_id)
 }
 
@@ -523,7 +510,7 @@ pub fn untag_book_inner(conn: &Connection, book_slug: &str, tag_id: i64) -> Resu
 
 #[tauri::command]
 pub fn untag_book(book_slug: String, tag_id: i64, state: State<'_, DbState>) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     untag_book_inner(&conn, &book_slug, tag_id)
 }
 
@@ -548,7 +535,7 @@ pub fn list_book_tags_all_inner(conn: &Connection) -> Result<Vec<BookTagMapping>
 
 #[tauri::command]
 pub fn list_book_tags_all(state: State<'_, DbState>) -> Result<Vec<BookTagMapping>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     list_book_tags_all_inner(&conn)
 }
 
@@ -585,7 +572,7 @@ pub fn open_file(file_path: String, state: State<'_, DbState>) -> Result<String,
         .ok_or("No parent directory")?
         .to_string_lossy()
         .to_string();
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
 
     // Find or insert directory
     let dir_id: i64 = match conn.query_row(
@@ -639,85 +626,28 @@ pub fn ensure_axiomatic_dir(dir_path: &str) -> Result<PathBuf, String> {
 // ---------- task-003: progress commands ----------
 
 #[tauri::command]
-pub fn get_all_progress(
-    dir_path: String,
-) -> Result<HashMap<String, BookProgress>, String> {
-    let progress_file = Path::new(&dir_path).join(".axiomatic").join("progress.json");
-    if !progress_file.exists() {
-        return Ok(HashMap::new());
-    }
-    let data = std::fs::read_to_string(&progress_file).map_err(|e| e.to_string())?;
-    let map: HashMap<String, BookProgress> =
-        serde_json::from_str(&data).map_err(|e| e.to_string())?;
-    Ok(map)
+pub fn get_all_progress(dir_path: String) -> Result<HashMap<String, BookProgress>, String> {
+    Ok(crate::json_storage::read_json(&dir_path, "progress.json"))
 }
 
 #[tauri::command]
-pub fn save_progress(
-    dir_path: String,
-    slug: String,
-    progress: BookProgress,
-) -> Result<(), String> {
-    let axiomatic_dir = ensure_axiomatic_dir(&dir_path)?;
-    let progress_file = axiomatic_dir.join("progress.json");
-
-    // Read existing data
-    let mut map: HashMap<String, BookProgress> = if progress_file.exists() {
-        let data = std::fs::read_to_string(&progress_file).map_err(|e| e.to_string())?;
-        serde_json::from_str(&data).unwrap_or_default()
-    } else {
-        HashMap::new()
-    };
-
+pub fn save_progress(dir_path: String, slug: String, progress: BookProgress) -> Result<(), String> {
+    let mut map: HashMap<String, BookProgress> = crate::json_storage::read_json(&dir_path, "progress.json");
     map.insert(slug, progress);
-
-    let json = serde_json::to_string_pretty(&map).map_err(|e| e.to_string())?;
-    std::fs::write(&progress_file, json).map_err(|e| e.to_string())?;
-    Ok(())
+    crate::json_storage::write_json(&dir_path, "progress.json", &map)
 }
 
 // ---------- task-004: starred commands ----------
 
 #[tauri::command]
 pub fn get_starred(dir_path: String) -> Result<Vec<String>, String> {
-    let starred_path = Path::new(&dir_path).join(".axiomatic").join("starred.json");
-    if !starred_path.exists() {
-        return Ok(Vec::new());
-    }
-    let contents = std::fs::read_to_string(&starred_path).map_err(|e| {
-        format!(
-            "Failed to read {}: {}",
-            starred_path.display(),
-            e
-        )
-    })?;
-    let map: HashMap<String, bool> = serde_json::from_str(&contents).map_err(|e| {
-        format!(
-            "Failed to parse {}: {}",
-            starred_path.display(),
-            e
-        )
-    })?;
-    let slugs: Vec<String> = map.into_keys().collect();
-    Ok(slugs)
+    let map: HashMap<String, bool> = crate::json_storage::read_json(&dir_path, "starred.json");
+    Ok(map.into_keys().collect())
 }
 
 #[tauri::command]
 pub fn toggle_starred(dir_path: String, slug: String) -> Result<bool, String> {
-    let axiomatic_dir = ensure_axiomatic_dir(&dir_path)?;
-    let starred_path = axiomatic_dir.join("starred.json");
-
-    let mut map: HashMap<String, bool> = if starred_path.exists() {
-        let contents = std::fs::read_to_string(&starred_path).map_err(|e| {
-            format!("Failed to read {}: {}", starred_path.display(), e)
-        })?;
-        serde_json::from_str(&contents).map_err(|e| {
-            format!("Failed to parse {}: {}", starred_path.display(), e)
-        })?
-    } else {
-        HashMap::new()
-    };
-
+    let mut map: HashMap<String, bool> = crate::json_storage::read_json(&dir_path, "starred.json");
     let new_state = if map.contains_key(&slug) {
         map.remove(&slug);
         false
@@ -725,14 +655,7 @@ pub fn toggle_starred(dir_path: String, slug: String) -> Result<bool, String> {
         map.insert(slug, true);
         true
     };
-
-    let json = serde_json::to_string_pretty(&map).map_err(|e| {
-        format!("Failed to serialize starred data: {}", e)
-    })?;
-    std::fs::write(&starred_path, json).map_err(|e| {
-        format!("Failed to write {}: {}", starred_path.display(), e)
-    })?;
-
+    crate::json_storage::write_json(&dir_path, "starred.json", &map)?;
     Ok(new_state)
 }
 
@@ -740,90 +663,41 @@ pub fn toggle_starred(dir_path: String, slug: String) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn get_xp(dir_path: String, slug: String) -> Result<i64, String> {
-    let axiomatic_dir = Path::new(&dir_path).join(".axiomatic");
-    let xp_path = axiomatic_dir.join("xp.json");
-    if !xp_path.exists() {
-        return Ok(0);
-    }
-    let data = std::fs::read_to_string(&xp_path).map_err(|e| e.to_string())?;
-    let map: HashMap<String, i64> =
-        serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    let map: HashMap<String, i64> = crate::json_storage::read_json(&dir_path, "xp.json");
     Ok(map.get(&slug).copied().unwrap_or(0))
 }
 
 #[tauri::command]
 pub fn increment_xp(dir_path: String, slug: String) -> Result<i64, String> {
-    let axiomatic_dir = ensure_axiomatic_dir(&dir_path)?;
-    let xp_path = axiomatic_dir.join("xp.json");
-    let mut map: HashMap<String, i64> = if xp_path.exists() {
-        let data = std::fs::read_to_string(&xp_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&data).map_err(|e| e.to_string())?
-    } else {
-        HashMap::new()
-    };
+    let mut map: HashMap<String, i64> = crate::json_storage::read_json(&dir_path, "xp.json");
     let entry = map.entry(slug).or_insert(0);
     *entry += 1;
     let new_value = *entry;
-    let json = serde_json::to_string_pretty(&map).map_err(|e| e.to_string())?;
-    std::fs::write(&xp_path, json).map_err(|e| e.to_string())?;
+    crate::json_storage::write_json(&dir_path, "xp.json", &map)?;
     Ok(new_value)
 }
 
 // ---------- task-007: slug migration commands ----------
 
 /// Collect all distinct slugs referenced in SQLite tables.
-/// Returns a map of slug -> list of evidence strings (which tables reference it).
 fn collect_db_slugs(conn: &Connection) -> Result<HashMap<String, Vec<String>>, String> {
-    let mut slug_evidence: HashMap<String, Vec<String>> = HashMap::new();
-
-    // highlights
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT slug FROM highlights")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for slug in rows.flatten() {
-        slug_evidence.entry(slug).or_default().push("highlights".into());
+    let mut evidence: HashMap<String, Vec<String>> = HashMap::new();
+    let tables = [
+        ("SELECT DISTINCT slug FROM highlights", "highlights"),
+        ("SELECT DISTINCT slug FROM notes", "notes"),
+        ("SELECT DISTINCT note_slug FROM note_images", "note_images"),
+        ("SELECT DISTINCT book_slug FROM book_tags", "book_tags"),
+    ];
+    for (sql, table) in tables {
+        let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+        for slug in stmt.query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .flatten()
+        {
+            evidence.entry(slug).or_default().push(table.into());
+        }
     }
-
-    // notes
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT slug FROM notes")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for slug in rows.flatten() {
-        slug_evidence.entry(slug).or_default().push("notes".into());
-    }
-
-    // note_images
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT note_slug FROM note_images")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for slug in rows.flatten() {
-        slug_evidence.entry(slug).or_default().push("note_images".into());
-    }
-
-    // book_tags
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT book_slug FROM book_tags")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
-    for slug in rows.flatten() {
-        slug_evidence.entry(slug).or_default().push("book_tags".into());
-    }
-
-    // Note: snips are stored in .axiomatic/snips.json, not SQLite.
-    // The snips table was dropped in migration 3.
-
-    Ok(slug_evidence)
+    Ok(evidence)
 }
 
 /// Simple similarity score between two strings based on common character bigrams.
@@ -848,60 +722,16 @@ pub async fn detect_orphaned_slugs(
 ) -> Result<Vec<OrphanCandidate>, String> {
     // 1. Gather all data slugs from SQLite
     let (slug_evidence, dirs) = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let conn = get_db(&state)?;
         let evidence = collect_db_slugs(&conn)?;
-        let dirs = query_all_directories(&conn)?;
+        let dirs = list_directories_inner(&conn)?;
         (evidence, dirs)
     };
 
     // 2. Discover all current textbook slugs by scanning directories
     let dirs_clone = dirs.clone();
     let textbooks: Vec<Textbook> = tauri::async_runtime::spawn_blocking(move || {
-        let mut textbooks = Vec::new();
-        for dir in &dirs_clone {
-            let dir_path = Path::new(&dir.path);
-            if !dir_path.is_dir() {
-                continue;
-            }
-            for entry in WalkDir::new(dir_path)
-                .into_iter()
-                .filter_entry(|e| {
-                    e.file_name().to_str().map(|s| s != ".axiomatic").unwrap_or(true)
-                })
-                .flatten()
-            {
-                let path = entry.path();
-                if path.is_file()
-                    && path
-                        .extension()
-                        .map(|e| e.to_ascii_lowercase() == "pdf")
-                        .unwrap_or(false)
-                {
-                    let file_name = path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let stem = path
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let slug = format!("{}_{}", dir.id, sanitize_slug(&stem));
-                    let title = title_from_stem(&stem);
-                    let full_path = path.to_string_lossy().to_string();
-                    textbooks.push(Textbook {
-                        slug,
-                        title,
-                        file: file_name,
-                        dir_id: dir.id,
-                        dir_path: dir.path.clone(),
-                        full_path,
-                    });
-                }
-            }
-        }
-        textbooks
+        scan_textbooks(&dirs_clone)
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -984,30 +814,15 @@ pub fn migrate_slug_inner(
         .map_err(|e| e.to_string())?;
 
     let result = (|| -> Result<(), String> {
-        conn.execute(
+        for sql in [
             "UPDATE highlights SET slug = ?1 WHERE slug = ?2",
-            rusqlite::params![new_slug, old_slug],
-        )
-        .map_err(|e| e.to_string())?;
-
-        conn.execute(
             "UPDATE notes SET slug = ?1 WHERE slug = ?2",
-            rusqlite::params![new_slug, old_slug],
-        )
-        .map_err(|e| e.to_string())?;
-
-        conn.execute(
             "UPDATE note_images SET note_slug = ?1 WHERE note_slug = ?2",
-            rusqlite::params![new_slug, old_slug],
-        )
-        .map_err(|e| e.to_string())?;
-
-        conn.execute(
             "UPDATE book_tags SET book_slug = ?1 WHERE book_slug = ?2",
-            rusqlite::params![new_slug, old_slug],
-        )
-        .map_err(|e| e.to_string())?;
-
+        ] {
+            conn.execute(sql, rusqlite::params![new_slug, old_slug])
+                .map_err(|e| e.to_string())?;
+        }
         Ok(())
     })();
 
@@ -1025,104 +840,56 @@ pub fn migrate_slug_inner(
     // 2. Update .axiomatic/ JSON files in the directory
     let axiomatic_dir = Path::new(dir_path).join(".axiomatic");
     if axiomatic_dir.is_dir() {
-        // progress.json
-        let progress_path = axiomatic_dir.join("progress.json");
-        if progress_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&progress_path) {
+        // Helper: rename a key in a JSON map file
+        let rename_key = |filename: &str| {
+            let path = axiomatic_dir.join(filename);
+            if let Ok(data) = std::fs::read_to_string(&path) {
                 if let Ok(mut map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&data) {
                     if let Some(val) = map.remove(old_slug) {
                         map.insert(new_slug.to_string(), val);
                         if let Ok(json) = serde_json::to_string_pretty(&map) {
-                            std::fs::write(&progress_path, json).ok();
+                            std::fs::write(&path, json).ok();
                         }
                     }
                 }
             }
-        }
+        };
 
-        // starred.json
-        let starred_path = axiomatic_dir.join("starred.json");
-        if starred_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&starred_path) {
-                if let Ok(mut map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&data) {
-                    if let Some(val) = map.remove(old_slug) {
-                        map.insert(new_slug.to_string(), val);
-                        if let Ok(json) = serde_json::to_string_pretty(&map) {
-                            std::fs::write(&starred_path, json).ok();
-                        }
-                    }
-                }
-            }
-        }
+        rename_key("progress.json");
+        rename_key("starred.json");
+        rename_key("xp.json");
+        rename_key("pomodoro-xp.json");
 
-        // snips.json
+        // snips.json — update slug field in array items
         let snips_path = axiomatic_dir.join("snips.json");
-        if snips_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&snips_path) {
-                if let Ok(mut arr) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
-                    for item in arr.iter_mut() {
-                        if let Some(obj) = item.as_object_mut() {
-                            if obj.get("slug").and_then(|v| v.as_str()) == Some(old_slug) {
-                                obj.insert("slug".into(), serde_json::Value::String(new_slug.to_string()));
-                            }
-                        }
+        if let Ok(data) = std::fs::read_to_string(&snips_path) {
+            if let Ok(mut arr) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                for item in arr.iter_mut().filter_map(|v| v.as_object_mut()) {
+                    if item.get("slug").and_then(|v| v.as_str()) == Some(old_slug) {
+                        item.insert("slug".into(), serde_json::Value::String(new_slug.to_string()));
                     }
-                    if let Ok(json) = serde_json::to_string_pretty(&arr) {
-                        std::fs::write(&snips_path, json).ok();
-                    }
+                }
+                if let Ok(json) = serde_json::to_string_pretty(&arr) {
+                    std::fs::write(&snips_path, json).ok();
                 }
             }
         }
 
-        // xp.json
-        let xp_path = axiomatic_dir.join("xp.json");
-        if xp_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&xp_path) {
-                if let Ok(mut map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&data) {
-                    if let Some(val) = map.remove(old_slug) {
-                        map.insert(new_slug.to_string(), val);
-                        if let Ok(json) = serde_json::to_string_pretty(&map) {
-                            std::fs::write(&xp_path, json).ok();
-                        }
-                    }
-                }
-            }
-        }
-
-        // pomodoro-xp.json
-        let pomodoro_xp_path = axiomatic_dir.join("pomodoro-xp.json");
-        if pomodoro_xp_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&pomodoro_xp_path) {
-                if let Ok(mut map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&data) {
-                    if let Some(val) = map.remove(old_slug) {
-                        map.insert(new_slug.to_string(), val);
-                        if let Ok(json) = serde_json::to_string_pretty(&map) {
-                            std::fs::write(&pomodoro_xp_path, json).ok();
-                        }
-                    }
-                }
-            }
-        }
-
-        // sessions.json — update slug references in book entries
+        // sessions.json — update slug in nested book entries
         let sessions_path = axiomatic_dir.join("sessions.json");
-        if sessions_path.is_file() {
-            if let Ok(data) = std::fs::read_to_string(&sessions_path) {
-                if let Ok(mut arr) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
-                    for session in arr.iter_mut() {
-                        if let Some(books) = session.get_mut("books").and_then(|b| b.as_array_mut()) {
-                            for book in books.iter_mut() {
-                                if let Some(obj) = book.as_object_mut() {
-                                    if obj.get("slug").and_then(|v| v.as_str()) == Some(old_slug) {
-                                        obj.insert("slug".into(), serde_json::Value::String(new_slug.to_string()));
-                                    }
-                                }
+        if let Ok(data) = std::fs::read_to_string(&sessions_path) {
+            if let Ok(mut arr) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                for session in &mut arr {
+                    if let Some(books) = session.get_mut("books").and_then(|b| b.as_array_mut()) {
+                        for book in books.iter_mut().filter_map(|v| v.as_object_mut()) {
+                            if book.get("slug").and_then(|v| v.as_str()) == Some(old_slug) {
+                                book.insert("slug".into(), serde_json::Value::String(new_slug.to_string()));
                             }
                         }
                     }
-                    if let Ok(json) = serde_json::to_string_pretty(&arr) {
-                        std::fs::write(&sessions_path, json).ok();
-                    }
+                }
+                if let Ok(json) = serde_json::to_string_pretty(&arr) {
+                    std::fs::write(&sessions_path, json).ok();
                 }
             }
         }
@@ -1138,7 +905,7 @@ pub fn migrate_slug(
     dir_path: String,
     state: State<'_, DbState>,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = get_db(&state)?;
     migrate_slug_inner(&conn, &old_slug, &new_slug, &dir_path)
 }
 

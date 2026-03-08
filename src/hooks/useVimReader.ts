@@ -8,7 +8,7 @@ const MIN_ZOOM = 0.25
 const MAX_ZOOM = 5
 const ZOOM_FACTOR = 1.1
 
-function clampZoom(z: number): number {
+export function clampZoom(z: number): number {
   return Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z)) * 100) / 100
 }
 

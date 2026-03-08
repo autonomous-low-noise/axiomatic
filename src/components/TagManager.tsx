@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { Tag } from '../hooks/useTags'
-import { defaultTagColor } from '../lib/tag-colors'
+
+const TAG_PALETTE = [
+  '#dc322f', '#cb4b16', '#b58900', '#859900', '#2aa198',
+  '#268bd2', '#6c71c4', '#d33682', '#c97a2c', '#5e8c61',
+] as const
 
 interface Props {
   tags: Tag[]
@@ -52,7 +56,7 @@ export function TagManager({ tags, anchorRef, onCreate, onDelete, onUpdateColor,
   const handleCreate = () => {
     const name = newName.trim()
     if (!name) return
-    const color = defaultTagColor(tags.length)
+    const color = TAG_PALETTE[tags.length % TAG_PALETTE.length]
     onCreate(name, color)
     setNewName('')
   }

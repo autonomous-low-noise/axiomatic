@@ -36,6 +36,9 @@ dist-ssr
 # Claude
 .claude/
 
+# Test
+coverage/
+
 # Playwright
 /test-results/
 /playwright-report/

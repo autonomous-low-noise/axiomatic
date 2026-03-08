@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { buildBoundaries, moveDown, moveUp, moveLeft, moveRight } from '../lib/grid-nav'
 
 function getColumnsFromGrid(grid: HTMLDivElement | null): number {
   if (grid) {
@@ -26,107 +27,31 @@ export function useVimOverview(
       const count = slugs.length
       if (count === 0) return
 
-      // Build cumulative boundaries from sectionSizes
-      const boundaries: number[] = []
-      let cum = 0
-      for (const size of sectionSizes) {
-        if (size > 0) {
-          boundaries.push(cum)
-          cum += size
-        }
-      }
-
-      // Helper: given a flat index, return the section start, size, and local offset
-      const section = (idx: number) => {
-        for (let i = boundaries.length - 1; i >= 0; i--) {
-          if (idx >= boundaries[i]) {
-            const start = boundaries[i]
-            const end = i + 1 < boundaries.length ? boundaries[i + 1] : count
-            return { start, size: end - start, local: idx - start, sectionIdx: i }
-          }
-        }
-        return { start: 0, size: count, local: idx, sectionIdx: 0 }
-      }
+      const boundaries = buildBoundaries(sectionSizes)
 
       switch (e.key) {
         case 'ArrowDown':
         case 'j': {
           e.preventDefault()
-          setSelectedIndex((prev) => {
-            if (prev === -1) return 0
-
-            const sec = section(prev)
-            const localRow = Math.floor(sec.local / cols)
-            const col = sec.local % cols
-            const lastRow = Math.floor((sec.size - 1) / cols)
-
-            if (localRow < lastRow) {
-              // Move down within the same section
-              const next = sec.start + (localRow + 1) * cols + col
-              return next < sec.start + sec.size ? next : sec.start + sec.size - 1
-            }
-
-            // At the last row of this section — try crossing to the next
-            if (sec.sectionIdx + 1 < boundaries.length) {
-              const nextStart = boundaries[sec.sectionIdx + 1]
-              const target = nextStart + col
-              return target < count ? target : count - 1
-            }
-
-            return prev
-          })
+          setSelectedIndex((prev) => moveDown(prev, cols, boundaries, count))
           break
         }
         case 'ArrowUp':
         case 'k': {
           e.preventDefault()
-          setSelectedIndex((prev) => {
-            if (prev <= 0) return prev
-
-            const sec = section(prev)
-            const localRow = Math.floor(sec.local / cols)
-            const col = sec.local % cols
-
-            if (localRow > 0) {
-              // Move up within the same section
-              return sec.start + (localRow - 1) * cols + col
-            }
-
-            // At the first row of this section — try crossing to the previous
-            if (sec.sectionIdx > 0) {
-              const prevStart = boundaries[sec.sectionIdx - 1]
-              const prevEnd = boundaries[sec.sectionIdx]
-              const prevSize = prevEnd - prevStart
-              const lastPrevRow = Math.floor((prevSize - 1) / cols)
-              const target = prevStart + lastPrevRow * cols + col
-              return target < prevEnd ? target : prevEnd - 1
-            }
-
-            return prev
-          })
+          setSelectedIndex((prev) => moveUp(prev, cols, boundaries, count))
           break
         }
         case 'ArrowLeft':
         case 'h': {
           e.preventDefault()
-          setSelectedIndex((prev) => {
-            if (prev <= 0) return prev
-            const sec = section(prev)
-            const localRowStart = Math.floor(sec.local / cols) * cols
-            return sec.local > localRowStart ? prev - 1 : prev
-          })
+          setSelectedIndex((prev) => moveLeft(prev, cols, boundaries, count))
           break
         }
         case 'ArrowRight':
         case 'l': {
           e.preventDefault()
-          setSelectedIndex((prev) => {
-            if (prev === -1) return 0
-            const sec = section(prev)
-            const localRowEnd = Math.floor(sec.local / cols) * cols + cols - 1
-            const next = prev + 1
-            return sec.local < localRowEnd && next < sec.start + sec.size ? next : prev
-          })
+          setSelectedIndex((prev) => moveRight(prev, cols, boundaries, count))
           break
         }
         case 'Enter': {

@@ -15,27 +15,18 @@ export interface LinkAnnotation {
     | { type: 'external'; url: string }
 }
 
-// Module-level cache survives component remounts (tab switches)
-const linkCache = new Map<string, LinkAnnotation[]>()
-
-function cacheKey(path: string, page: number): string {
-  return `${path}:${page}`
-}
+const cache = new Map<string, LinkAnnotation[]>()
 
 export function usePageLinks(fullPath: string | undefined) {
   const getLinks = useCallback(
     async (page: number): Promise<LinkAnnotation[]> => {
       if (!fullPath) return []
-      const key = cacheKey(fullPath, page)
-      const cached = linkCache.get(key)
-      if (cached) return cached
-
+      const key = `${fullPath}:${page}`
+      const hit = cache.get(key)
+      if (hit) return hit
       try {
-        const links = await invoke<LinkAnnotation[]>('get_page_links', {
-          path: fullPath,
-          page,
-        })
-        linkCache.set(key, links)
+        const links = await invoke<LinkAnnotation[]>('get_page_links', { path: fullPath, page })
+        cache.set(key, links)
         return links
       } catch {
         return []

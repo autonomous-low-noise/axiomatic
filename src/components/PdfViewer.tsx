@@ -70,11 +70,6 @@ function pageAtOffset(offsets: number[], scrollTop: number): number {
   return lo + 1
 }
 
-function generateId(): string {
-  return crypto.randomUUID()
-}
-
-
 const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfViewerInner({
   docInfo,
   fullPath,
@@ -121,6 +116,13 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
   const prevVisualHeightRef = useRef(0)
   const commitTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const prerenderSeqRef = useRef(0)
+
+  // Warm-page tracking: only mount <img> for pages pre-rendered into
+  // SharedRenderCache, so the protocol handler always hits the fast path
+  // (no main-thread blocking on Linux/WebKitGTK).
+  const warmPagesRef = useRef<Set<string>>(new Set())
+  const [warmTick, setWarmTick] = useState(0)
+  const pageDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const layoutWidth = BASE_WIDTH * committedZoom
 
@@ -190,6 +192,10 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           // Render thread may have preempted — still commit
         }
         if (seq !== prerenderSeqRef.current) return
+        const targetW = Math.round(BASE_WIDTH * newZoom)
+        for (const p of pagesToRender) {
+          warmPagesRef.current.add(`${p}:${targetW}`)
+        }
         committedZoomRef.current = newZoom
         startTransition(() => setCommittedZoom(newZoom))
       }, 300)
@@ -253,7 +259,8 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
       if (trackingEnabled.current) {
         const centerY = scrollTop + viewH / 2
         const page = pageAtOffset(pageOffsets, centerY)
-        setCurrentPage(page)
+        clearTimeout(pageDebounceRef.current)
+        pageDebounceRef.current = setTimeout(() => setCurrentPage(page), 150)
       }
     }
 
@@ -270,8 +277,36 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     return () => {
       container.removeEventListener('scroll', onScroll)
       if (rafId.current) cancelAnimationFrame(rafId.current)
+      clearTimeout(pageDebounceRef.current)
     }
   }, [numPages, pageOffsets])
+
+  // Pre-warm cache for newly visible pages via IPC (runs on spawn_blocking,
+  // not the main thread). Pages show a placeholder until warm.
+  useEffect(() => {
+    const currentWidth = Math.round(layoutWidth)
+    const toPrerender: number[] = []
+    for (let p = visibleRange.start; p <= visibleRange.end; p++) {
+      if (!warmPagesRef.current.has(`${p}:${currentWidth}`)) {
+        toPrerender.push(p)
+      }
+    }
+    if (toPrerender.length === 0) return
+
+    const markWarm = () => {
+      for (const p of toPrerender) {
+        warmPagesRef.current.add(`${p}:${currentWidth}`)
+      }
+      setWarmTick(t => t + 1)
+    }
+
+    invoke('prerender_pages', {
+      path: fullPath,
+      pages: toPrerender,
+      width: currentWidth,
+      dpr,
+    }).then(markWarm).catch(markWarm)
+  }, [visibleRange, layoutWidth, fullPath, dpr])
 
   // Notify parent of page changes
   useEffect(() => {
@@ -513,7 +548,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
       lines.push(currentLine)
 
       // Create merged rects per line
-      const groupId = generateId()
+      const groupId = crypto.randomUUID()
       for (const line of lines) {
         const minX = Math.min(...line.map((r) => r.x))
         const minY = Math.min(...line.map((r) => r.y))
@@ -617,13 +652,20 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
               }}
               onContextMenu={(e) => handleContextMenu(e, pageNum)}
             >
-              <img
-                src={`pdfium://localhost/render?path=${encodedPath}&page=${pageNum}&width=${Math.round(layoutWidth)}&dpr=${dpr}`}
-                alt={`Page ${pageNum}`}
-                className="pdf-page-img block h-full w-full"
-                draggable={false}
-                style={{ position: 'relative', zIndex: 0 }}
-              />
+              {warmPagesRef.current.has(`${pageNum}:${Math.round(layoutWidth)}`) ? (
+                <img
+                  src={`pdfium://localhost/render?path=${encodedPath}&page=${pageNum}&width=${Math.round(layoutWidth)}&dpr=${dpr}`}
+                  alt={`Page ${pageNum}`}
+                  className="pdf-page-img block h-full w-full"
+                  draggable={false}
+                  style={{ position: 'relative', zIndex: 0 }}
+                />
+              ) : (
+                <div
+                  className="block h-full w-full bg-[#eee8d5] dark:bg-[#073642]"
+                  style={{ position: 'relative', zIndex: 0 }}
+                />
+              )}
               {textLayer && (
                 <TextLayer
                   textLayer={textLayer}
@@ -670,7 +712,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           )
         },
       ),
-    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, pageLinks, pageTextLayers, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage, snipMode, onSnipRegion],
+    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, pageLinks, pageTextLayers, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage, snipMode, onSnipRegion, warmTick],
   )
 
   return (

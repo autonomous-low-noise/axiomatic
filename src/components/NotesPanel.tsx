@@ -140,6 +140,11 @@ export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, w
     })
   }, [isDark])
 
+  // Tell CodeMirror to remeasure when panel width changes
+  useEffect(() => {
+    viewRef.current?.requestMeasure()
+  }, [width])
+
   // Update content when slug/page changes
   useEffect(() => {
     const newKey = `${slug}:${page}`

@@ -2,22 +2,30 @@ import { useMemo } from 'react'
 import type { Highlight } from '../hooks/useHighlights'
 
 interface Props {
-  highlights: Highlight[]
+  items: Highlight[]
+  variant: 'highlights' | 'bookmarks'
   width: number
   onNavigate: (page: number) => void
   onDeleteHighlight: (id: number) => void
   onDeleteHighlightGroup: (groupId: string) => void
 }
 
-export function HighlightsPanel({
-  highlights,
+const CONFIG = {
+  highlights: { title: 'Highlights', empty: 'No highlights yet. Select text and right-click to highlight.' },
+  bookmarks: { title: 'Bookmarks', empty: 'No bookmarks yet. Select text and right-click to bookmark.' },
+} as const
+
+export function AnnotationPanel({
+  items,
+  variant,
   width,
   onNavigate,
   onDeleteHighlight,
   onDeleteHighlightGroup,
 }: Props) {
-  // Group highlights by group_id (multi-rect selections share one entry)
-  // Legacy highlights with no group_id are shown individually
+  const { title, empty } = CONFIG[variant]
+
+  // Group by group_id (multi-rect selections share one entry)
   const entries = useMemo(() => {
     const grouped = new Map<
       string,
@@ -25,7 +33,7 @@ export function HighlightsPanel({
     >()
     const singles: { page: number; color: string; text: string; id: number }[] = []
 
-    for (const h of highlights) {
+    for (const h of items) {
       if (h.group_id) {
         const existing = grouped.get(h.group_id)
         if (existing) {
@@ -62,7 +70,7 @@ export function HighlightsPanel({
 
     result.sort((a, b) => a.page - b.page)
     return result
-  }, [highlights])
+  }, [items])
 
   // Group by page for display
   const pageGroups = useMemo(() => {
@@ -98,7 +106,7 @@ export function HighlightsPanel({
     <div className="flex h-full flex-col overflow-hidden" style={{ width }}>
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
         <span className="text-xs font-medium text-[#586e75] dark:text-[#93a1a1]">
-          Highlights
+          {title}
         </span>
         <span className="text-xs tabular-nums text-[#93a1a1] dark:text-[#657b83]">
           {entries.length}
@@ -107,7 +115,7 @@ export function HighlightsPanel({
       <div className="flex-1 overflow-y-auto bg-[#fdf6e3] dark:bg-[#002b36]">
         {pageGroups.length === 0 && (
           <p className="p-4 text-center text-xs text-[#93a1a1] dark:text-[#657b83]">
-            No highlights yet. Select text and right-click to highlight.
+            {empty}
           </p>
         )}
         {pageGroups.map((group) => (
@@ -123,10 +131,26 @@ export function HighlightsPanel({
                 className="group flex cursor-pointer items-start gap-2 border-b border-[#eee8d5]/50 px-3 py-2 hover:bg-[#eee8d5] dark:border-[#073642]/50 dark:hover:bg-[#073642]"
                 onClick={() => onNavigate(entry.page)}
               >
-                <span
-                  className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: entry.color }}
-                />
+                {variant === 'highlights' ? (
+                  <span
+                    className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: entry.color }}
+                  />
+                ) : (
+                  <svg
+                    className="mt-0.5 shrink-0 text-[#93a1a1] dark:text-[#657b83]"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                  </svg>
+                )}
                 <span className="mr-2 line-clamp-3 min-w-0 flex-1 overflow-hidden text-xs leading-relaxed text-[#586e75] dark:text-[#93a1a1]">
                   {entry.text || '(no text)'}
                 </span>
@@ -136,7 +160,7 @@ export function HighlightsPanel({
                     e.stopPropagation()
                     handleDelete(entry)
                   }}
-                  aria-label="Delete highlight"
+                  aria-label={`Delete ${variant === 'highlights' ? 'highlight' : 'bookmark'}`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />

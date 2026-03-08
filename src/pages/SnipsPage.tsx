@@ -379,11 +379,6 @@ export function SnipsPage() {
     [tagMenu, removeTag],
   )
 
-  // Format date as YYYY-MM-DD
-  const formatDate = useCallback((iso: string) => {
-    if (!iso) return ''
-    return iso.slice(0, 10)
-  }, [])
 
   if (loading) {
     return (
@@ -573,7 +568,7 @@ export function SnipsPage() {
                     )}
                   </td>
                   <td className="px-4 py-2 tabular-nums text-[#93a1a1] dark:text-[#586e75]">
-                    {formatDate(snip.created_at)}
+                    {snip.created_at.slice(0, 10)}
                   </td>
                 </tr>
               ))}

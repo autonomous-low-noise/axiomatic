@@ -123,4 +123,31 @@ describe('ReaderToolbar', () => {
     expect(screen.getByLabelText('Loop sorted')).toBeInTheDocument()
     expect(screen.getByTestId('pomodoro-timer')).toBeInTheDocument()
   })
+
+  // Toolbar overflow prevention: side sections use overflow-hidden
+  it('has overflow-hidden on left and right sections', () => {
+    const { container } = renderToolbar({
+      onToggleSnipMode: vi.fn(),
+      hasSnips: true,
+      onLoopSorted: vi.fn(),
+      onLoopShuffled: vi.fn(),
+    })
+    const toolbar = container.querySelector('[class*="h-10"]')!
+    const left = toolbar.children[0] as HTMLElement
+    const right = toolbar.children[2] as HTMLElement
+    expect(left.className).toContain('overflow-hidden')
+    expect(right.className).toContain('overflow-hidden')
+  })
+
+  // Title section takes flex-1, side sections use natural width
+  it('title section is flex-1 while side sections are not', () => {
+    const { container } = renderToolbar()
+    const toolbar = container.querySelector('[class*="h-10"]')!
+    const left = toolbar.children[0] as HTMLElement
+    const center = toolbar.children[1] as HTMLElement
+    const right = toolbar.children[2] as HTMLElement
+    expect(left.className).not.toContain('flex-1')
+    expect(center.className).toContain('flex-1')
+    expect(right.className).not.toContain('flex-1')
+  })
 })

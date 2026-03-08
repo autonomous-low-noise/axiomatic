@@ -3,7 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { router } from './router'
-import { migrateNotesToSqlite } from './lib/migrate'
+import { migrateNotesFromJson } from './lib/notes'
 
 async function openFileByPath(filePath: string) {
   try {
@@ -12,6 +12,17 @@ async function openFileByPath(filePath: string) {
   } catch (e) {
     console.error('Failed to open file:', e)
   }
+}
+
+const NOTES_SQLITE_KEY = 'axiomatic:migrated-notes-to-sqlite'
+
+async function migrateNotesToSqlite() {
+  if (localStorage.getItem(NOTES_SQLITE_KEY)) return
+  const raw = localStorage.getItem('axiomatic:notes')
+  if (raw) {
+    try { await migrateNotesFromJson(raw) } catch { return }
+  }
+  localStorage.setItem(NOTES_SQLITE_KEY, new Date().toISOString())
 }
 
 export default function App() {

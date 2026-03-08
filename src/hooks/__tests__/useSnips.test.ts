@@ -4,7 +4,7 @@ import { mockInvoke, resetMockInvoke, getInvokeCallsFor } from '../../../__mocks
 
 vi.mock('@tauri-apps/api/core')
 
-import { useSnips } from '../useSnips'
+import { useSnips, useAllSnips } from '../useSnips'
 import type { Snip } from '../useSnips'
 
 const sampleSnip: Snip = {
@@ -126,5 +126,68 @@ describe('useSnips', () => {
     expect(result.current.snips).toEqual([])
     expect(result.current.xp).toBe(0)
     expect(getInvokeCallsFor('list_snips').length).toBe(0)
+  })
+})
+
+describe('useAllSnips', () => {
+  const dir1 = { path: '/lib1', label: 'Library 1' }
+  const dir2 = { path: '/lib2', label: 'Library 2' }
+
+  const snipA: Snip = { ...sampleSnip, id: 'a', slug: 'book_a', tags: ['math'] }
+  const snipB: Snip = { ...sampleSnip, id: 'b', slug: 'book_b', tags: [] }
+
+  it('loads snips from all directories', async () => {
+    mockInvoke('list_all_snips', (args: Record<string, unknown>) =>
+      args.dirPath === '/lib1' ? [snipA] : [snipB],
+    )
+    // Use useMemo-stable reference via initialProps
+    const dirs = [dir1, dir2]
+    const { result } = renderHook(({ d }) => useAllSnips(d), { initialProps: { d: dirs } })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.snips).toHaveLength(2)
+    expect(result.current.snips[0].dirPath).toBe('/lib1')
+    expect(result.current.snips[1].dirPath).toBe('/lib2')
+  })
+
+  it('addTag calls IPC and updates local state (deduplicates)', async () => {
+    mockInvoke('list_all_snips', [snipA])
+    mockInvoke('add_snip_tag', null)
+    const dirs = [dir1]
+    const { result } = renderHook(({ d }) => useAllSnips(d), { initialProps: { d: dirs } })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.addTag('/lib1', 'a', 'algebra')
+    })
+    expect(result.current.snips[0].tags).toEqual(['math', 'algebra'])
+
+    // Duplicate tag should not be added
+    await act(async () => {
+      await result.current.addTag('/lib1', 'a', 'math')
+    })
+    expect(result.current.snips[0].tags).toEqual(['math', 'algebra'])
+  })
+
+  it('removeTag calls IPC and filters tag from local state', async () => {
+    mockInvoke('list_all_snips', [{ ...snipA, tags: ['math', 'algebra'] }])
+    mockInvoke('remove_snip_tag', null)
+    const dirs = [dir1]
+    const { result } = renderHook(({ d }) => useAllSnips(d), { initialProps: { d: dirs } })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.removeTag('/lib1', 'a', 'math')
+    })
+    expect(result.current.snips[0].tags).toEqual(['algebra'])
+  })
+
+  it('returns empty snips when directories is empty', async () => {
+    const empty: typeof dir1[] = []
+    const { result } = renderHook(({ d }) => useAllSnips(d), { initialProps: { d: empty } })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.snips).toEqual([])
   })
 })
