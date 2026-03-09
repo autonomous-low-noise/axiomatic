@@ -106,4 +106,31 @@ describe('useProgress', () => {
     const { result } = renderHook(() => useProgress([]))
     expect(result.current.progress).toEqual({})
   })
+
+  it('returns loaded=false initially, true after IPC resolves', async () => {
+    let resolveGate!: (value: unknown) => void
+    const gate = new Promise((r) => { resolveGate = r })
+    mockInvoke('get_all_progress', () => gate.then(() => ({ book_a: { currentPage: 5, totalPages: 100, lastReadAt: '2024-01-01' } })))
+
+    const { useProgress } = await import('../useProgress')
+    const { result } = renderHook(() => useProgress(['/mydir']))
+
+    // Before IPC completes, loaded should be false
+    expect(result.current.loaded).toBe(false)
+
+    // Resolve the gate
+    await act(async () => { resolveGate(undefined) })
+
+    // After IPC completes, loaded should be true
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+  })
+
+  it('loaded is true immediately when dirPaths is empty', async () => {
+    const { useProgress } = await import('../useProgress')
+    const { result } = renderHook(() => useProgress([]))
+    // No async wait — loaded should be true synchronously
+    expect(result.current.loaded).toBe(true)
+  })
 })

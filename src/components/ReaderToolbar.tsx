@@ -77,7 +77,7 @@ export function ReaderToolbar({
     <div className="shrink-0">
       <div className="flex h-10 shrink-0 items-center border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
         {/* Left: back, page counter, zoom */}
-        <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+        <div className="flex shrink-0 items-center gap-1 overflow-hidden">
           <Link
             to="/"
             className={iconBtnClass}
@@ -119,11 +119,11 @@ export function ReaderToolbar({
           </div>
         </div>
         {/* Center: title */}
-        <span className="min-w-0 flex-1 truncate text-center text-xs text-[#93a1a1] dark:text-[#657b83]">
+        <span className="min-w-0 max-w-[50%] flex-1 truncate text-center text-xs text-[#93a1a1] dark:text-[#657b83]">
           {title}
         </span>
         {/* Right: search, actions */}
-        <div className="flex min-w-0 items-center justify-end gap-1 overflow-hidden">
+        <div className="flex shrink-0 items-center justify-end gap-1 overflow-hidden">
           {savedProgressPage != null && (
             <button
               onClick={onBackToProgress}

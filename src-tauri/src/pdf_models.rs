@@ -5,7 +5,7 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
 /// Cache key for rendered page images. Shared between protocol handler and render thread.
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct RenderKey {
     pub path: String,
     pub page: u32,
@@ -18,7 +18,7 @@ pub struct RenderKey {
 pub type SharedRenderCache = Arc<Mutex<LruCache<RenderKey, Vec<u8>>>>;
 
 pub fn new_shared_render_cache() -> SharedRenderCache {
-    Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(200).unwrap())))
+    Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(500).unwrap())))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

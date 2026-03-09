@@ -1,14 +1,15 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
+use std::sync::Arc;
 
+use crossbeam_channel::Sender;
 use tauri::State;
 
 use crate::pdf_engine::PdfRequest;
 use crate::pdf_models::{DocumentInfo, LinkAnnotation, OutlineEntry, PageTextLayer, SearchResult};
 
 pub struct PdfState {
-    pub sender: Mutex<Sender<PdfRequest>>,
+    pub sender: Sender<PdfRequest>,
     pub generation: Arc<AtomicU64>,
 }
 
@@ -20,8 +21,6 @@ fn send_request<T>(
     let request = request_fn(tx);
     state
         .sender
-        .lock()
-        .map_err(|_| "PDF engine lock poisoned".to_string())?
         .send(request)
         .map_err(|_| "PDF engine disconnected".to_string())?;
     rx.recv()
@@ -36,11 +35,7 @@ pub async fn open_document(
     // Bump generation so the render thread skips stale renders queued before this.
     state.generation.fetch_add(1, Ordering::Relaxed);
 
-    let sender = state
-        .sender
-        .lock()
-        .map_err(|_| "PDF engine lock poisoned".to_string())?
-        .clone();
+    let sender = state.sender.clone();
 
     tokio::task::spawn_blocking(move || {
         let (tx, rx) = mpsc::sync_channel(1);
@@ -59,11 +54,7 @@ pub async fn close_document(
     path: String,
     state: State<'_, PdfState>,
 ) -> Result<(), String> {
-    let sender = state
-        .sender
-        .lock()
-        .map_err(|_| "PDF engine lock poisoned".to_string())?
-        .clone();
+    let sender = state.sender.clone();
 
     tokio::task::spawn_blocking(move || {
         let (tx, rx) = mpsc::sync_channel(1);
@@ -85,11 +76,7 @@ pub async fn prerender_pages(
     dpr: f32,
     state: State<'_, PdfState>,
 ) -> Result<(), String> {
-    let sender = state
-        .sender
-        .lock()
-        .map_err(|_| "PDF engine lock poisoned".to_string())?
-        .clone();
+    let sender = state.sender.clone();
     let generation = state.generation.load(Ordering::Relaxed);
 
     tokio::task::spawn_blocking(move || {

@@ -33,6 +33,7 @@ lru = "0.12"
 tokio = { version = "1", features = ["rt"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 tempfile = "3"

@@ -6,9 +6,10 @@ import { useDirectories } from '../hooks/useDirectories'
 import { useProgress } from '../hooks/useProgress'
 import { useStarred } from '../hooks/useStarred'
 import { useTags } from '../hooks/useTags'
-import { useVimOverview } from '../hooks/useVimOverview'
+import { useVimOverview, type NavSection } from '../hooks/useVimOverview'
 import { useBatchedRender } from '../hooks/useBatchedRender'
 import { useSyncStatus } from '../hooks/useSyncStatus'
+import { useSectionCollapse } from '../hooks/useSectionCollapse'
 import { TileGrid } from '../components/TileGrid'
 import { BookTile } from '../components/BookTile'
 import { ContextMenu } from '../components/ContextMenu'
@@ -36,6 +37,7 @@ export function OverviewPage() {
   const { tags, bookTags, createTag, deleteTag, tagBook, untagBook, updateTagColor } = useTags()
   const gridRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const { isExpanded, toggle: toggleSection } = useSectionCollapse()
 
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -81,7 +83,7 @@ export function OverviewPage() {
     [filterQuery, activeTagFilters, bookTags],
   )
 
-  const { starredBooks, dirSections, slugs, sectionSizes } = useMemo(() => {
+  const { starredBooks, dirSections, slugs, sections } = useMemo(() => {
     const starredBooks = textbooks.filter(
       (b) => starred[b.slug] && matchesFilter(b.title, b.slug),
     )
@@ -110,27 +112,34 @@ export function OverviewPage() {
       dirSections.push({ dir, books })
     }
 
-    // Build flat slug array and section sizes
+    // Build flat slug array (only expanded sections) and sections metadata
     const slugs: string[] = []
-    const sectionSizes: number[] = []
+    const sections: NavSection[] = []
 
     if (starredBooks.length > 0) {
-      sectionSizes.push(starredBooks.length)
-      for (const b of starredBooks) slugs.push(b.slug)
+      const exp = isExpanded('starred')
+      sections.push({ key: 'starred', expanded: exp, tileCount: starredBooks.length })
+      if (exp) {
+        for (const b of starredBooks) slugs.push(b.slug)
+      }
     }
     for (const sec of dirSections) {
-      sectionSizes.push(sec.books.length)
-      for (const b of sec.books) slugs.push(b.slug)
+      const key = `dir-${sec.dir.id}`
+      const exp = isExpanded(key)
+      sections.push({ key, expanded: exp, tileCount: sec.books.length })
+      if (exp) {
+        for (const b of sec.books) slugs.push(b.slug)
+      }
     }
 
-    return { starredBooks, dirSections, slugs, sectionSizes }
-  }, [textbooks, directories, starred, matchesFilter, progress])
+    return { starredBooks, dirSections, slugs, sections }
+  }, [textbooks, directories, starred, matchesFilter, progress, isExpanded])
 
   const totalItems = slugs.length
   const renderLimit = useBatchedRender(totalItems)
   const syncStatus = useSyncStatus(loading, totalItems, renderLimit)
 
-  const { selectedIndex } = useVimOverview(slugs, gridRef, sectionSizes)
+  const { selectedIndex, selectedHeader } = useVimOverview(slugs, gridRef, sections, toggleSection)
 
   const handleContextMenu = useCallback(
     (slug: string, x: number, y: number) => {
@@ -358,52 +367,61 @@ export function OverviewPage() {
           <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
         </div>
       ) : (<>
-      {starredBooks.length > 0 && remaining > 0 && (
+      {starredBooks.length > 0 && (
         <section>
-          <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
-            Starred
-          </h2>
-          <TileGrid gridRef={getGridRef()}>
-            {starredBooks.slice(0, remaining).map((book, i) => {
-              const idx = flatOffset + i
-              return (
-                <BookTile
-                  key={book.slug}
-                  slug={book.slug}
-                  title={book.title}
-                  fullPath={book.full_path}
-                  progress={progress[book.slug]}
-                  starred={!!starred[book.slug]}
-                  selected={selectedIndex === idx}
-                  onToggleStar={toggle}
-                  onContextMenu={handleContextMenu}
-                  tags={bookTags[book.slug]}
-                />
-              )
-            })}
-          </TileGrid>
-          {(() => {
-            const shown = Math.min(starredBooks.length, remaining)
-            remaining -= shown
-            flatOffset += starredBooks.length
-            return null
-          })()}
+          <button
+            onClick={() => toggleSection('starred')}
+            className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-[#eee8d5] dark:border-[#073642] text-[#586e75] dark:text-[#93a1a1]${selectedHeader === 'starred' ? ' border-l-2 border-l-[#268bd2] bg-[#eee8d5] dark:bg-[#073642]' : ' border-l-2 border-l-transparent bg-[#fdf6e3] dark:bg-[#002b36]'}`}
+            data-section-key="starred"
+            {...(selectedHeader === 'starred' ? { 'data-header-selected': true } : {})}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 transition-transform" style={{ transform: isExpanded('starred') ? 'rotate(90deg)' : undefined }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            <span>Starred</span>
+            <span className="text-xs opacity-60">({starredBooks.length})</span>
+          </button>
+          {isExpanded('starred') && remaining > 0 && (
+            <>
+              <TileGrid gridRef={getGridRef()}>
+                {starredBooks.slice(0, remaining).map((book, i) => {
+                  const idx = flatOffset + i
+                  return (
+                    <BookTile
+                      key={book.slug}
+                      slug={book.slug}
+                      title={book.title}
+                      fullPath={book.full_path}
+                      progress={progress[book.slug]}
+                      starred={!!starred[book.slug]}
+                      selected={selectedIndex === idx}
+                      onToggleStar={toggle}
+                      onContextMenu={handleContextMenu}
+                      tags={bookTags[book.slug]}
+                    />
+                  )
+                })}
+              </TileGrid>
+              {(() => {
+                const shown = Math.min(starredBooks.length, remaining)
+                remaining -= shown
+                flatOffset += starredBooks.length
+                return null
+              })()}
+            </>
+          )}
         </section>
       )}
       {dirSections.map((sec) => {
-        if (remaining <= 0) {
+        const dirKey = `dir-${sec.dir.id}`
+        const expanded = isExpanded(dirKey)
+        let sectionContent = null
+        if (expanded && remaining > 0) {
+          const sectionStart = flatOffset
+          const booksToShow = sec.books.slice(0, remaining)
+          remaining -= booksToShow.length
           flatOffset += sec.books.length
-          return null
-        }
-        const sectionStart = flatOffset
-        const booksToShow = sec.books.slice(0, remaining)
-        remaining -= booksToShow.length
-        flatOffset += sec.books.length
-        return (
-          <section key={sec.dir.id}>
-            <h2 className="px-4 pt-4 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
-              {sec.dir.label}
-            </h2>
+          sectionContent = (
             <TileGrid gridRef={getGridRef()}>
               {booksToShow.map((book, i) => (
                 <BookTile
@@ -420,6 +438,23 @@ export function OverviewPage() {
                 />
               ))}
             </TileGrid>
+          )
+        }
+        return (
+          <section key={sec.dir.id}>
+            <button
+              onClick={() => toggleSection(dirKey)}
+              className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-[#eee8d5] dark:border-[#073642] text-[#586e75] dark:text-[#93a1a1]${selectedHeader === dirKey ? ' border-l-2 border-l-[#268bd2] bg-[#eee8d5] dark:bg-[#073642]' : ' border-l-2 border-l-transparent bg-[#fdf6e3] dark:bg-[#002b36]'}`}
+              data-section-key={dirKey}
+              {...(selectedHeader === dirKey ? { 'data-header-selected': true } : {})}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 transition-transform" style={{ transform: expanded ? 'rotate(90deg)' : undefined }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+              <span>{sec.dir.label}</span>
+              <span className="text-xs opacity-60">({sec.books.length})</span>
+            </button>
+            {sectionContent}
           </section>
         )
       })}

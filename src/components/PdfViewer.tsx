@@ -8,6 +8,7 @@ import { TextLayer } from './TextLayer'
 import { SnipOverlay } from './SnipOverlay'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
+import { pruneWarmPages } from '../lib/warm-pages'
 
 const BASE_WIDTH = 800
 const PAGE_GAP = 16
@@ -93,12 +94,9 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
   const rafId = useRef(0)
   const { getLinks } = usePageLinks(fullPath)
   const { getTextLayer, getCachedTextLayer } = usePageTextLayer(fullPath)
-  const [pageLinks, setPageLinks] = useState<Map<number, LinkAnnotation[]>>(
-    new Map(),
-  )
-  const [pageTextLayers, setPageTextLayers] = useState<Map<number, PageTextLayer>>(
-    new Map(),
-  )
+  const pageLinksRef = useRef<Map<number, LinkAnnotation[]>>(new Map())
+  const pageTextLayersRef = useRef<Map<number, PageTextLayer>>(new Map())
+  const [fetchTick, setFetchTick] = useState(0)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [clipStartPage, setClipStartPage] = useState<number | null>(null)
   const visibleRangeRef = useRef({ start: 1, end: 1 })
@@ -138,6 +136,8 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     return offsets
   }, [docInfo.pages, layoutWidth])
 
+  const pageOffsetsRef = useRef(pageOffsets)
+  pageOffsetsRef.current = pageOffsets
   const totalHeight = pageOffsets[numPages] - PAGE_GAP
   const totalHeightRef = useRef(totalHeight)
   totalHeightRef.current = totalHeight
@@ -234,18 +234,20 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     })
   }, [numPages, initialPage, pageOffsets])
 
-  // Scroll-driven virtualization + page tracking
+  // Scroll-driven virtualization + page tracking.
+  // Uses pageOffsetsRef to avoid re-attaching the scroll listener on zoom.
   useEffect(() => {
     const container = containerRef.current
     if (!container || numPages === 0) return
 
     const update = () => {
+      const offsets = pageOffsetsRef.current
       const sf = scaleRef.current
       const scrollTop = container.scrollTop / sf
       const viewH = container.clientHeight / sf
 
-      const first = pageAtOffset(pageOffsets, scrollTop)
-      const last = pageAtOffset(pageOffsets, scrollTop + viewH)
+      const first = pageAtOffset(offsets, scrollTop)
+      const last = pageAtOffset(offsets, scrollTop + viewH)
 
       setVisibleRange((prev) => {
         const newStart = Math.max(1, first - BUFFER)
@@ -253,12 +255,15 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
         if (prev.start === newStart && prev.end === newEnd) return prev
         const next = { start: newStart, end: newEnd }
         visibleRangeRef.current = next
+        // Keep warm tracking in sync with LRU cache — prune entries
+        // for pages the user scrolled far away from (likely evicted).
+        pruneWarmPages(warmPagesRef.current, newStart, newEnd)
         return next
       })
 
       if (trackingEnabled.current) {
         const centerY = scrollTop + viewH / 2
-        const page = pageAtOffset(pageOffsets, centerY)
+        const page = pageAtOffset(offsets, centerY)
         clearTimeout(pageDebounceRef.current)
         pageDebounceRef.current = setTimeout(() => setCurrentPage(page), 150)
       }
@@ -279,33 +284,43 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
       if (rafId.current) cancelAnimationFrame(rafId.current)
       clearTimeout(pageDebounceRef.current)
     }
-  }, [numPages, pageOffsets])
+  }, [numPages])
 
   // Pre-warm cache for newly visible pages via IPC (runs on spawn_blocking,
   // not the main thread). Pages show a placeholder until warm.
   useEffect(() => {
+    // Skip during zoom transition — the commit handler pre-renders
+    // at the target width; firing here would flood the render thread
+    // with stale-width requests.
+    if (currentZoomRef.current !== committedZoomRef.current) return
+
     const currentWidth = Math.round(layoutWidth)
-    const toPrerender: number[] = []
-    for (let p = visibleRange.start; p <= visibleRange.end; p++) {
-      if (!warmPagesRef.current.has(`${p}:${currentWidth}`)) {
-        toPrerender.push(p)
+    const timer = setTimeout(() => {
+      const toPrerender: number[] = []
+      for (let p = visibleRange.start; p <= visibleRange.end; p++) {
+        if (!warmPagesRef.current.has(`${p}:${currentWidth}`)) {
+          toPrerender.push(p)
+        }
       }
-    }
-    if (toPrerender.length === 0) return
+      if (toPrerender.length === 0) return
 
-    const markWarm = () => {
-      for (const p of toPrerender) {
-        warmPagesRef.current.add(`${p}:${currentWidth}`)
+      const seq = ++prerenderSeqRef.current
+      const markWarm = () => {
+        if (seq !== prerenderSeqRef.current) return
+        for (const p of toPrerender) {
+          warmPagesRef.current.add(`${p}:${currentWidth}`)
+        }
+        setWarmTick(t => t + 1)
       }
-      setWarmTick(t => t + 1)
-    }
 
-    invoke('prerender_pages', {
-      path: fullPath,
-      pages: toPrerender,
-      width: currentWidth,
-      dpr,
-    }).then(markWarm).catch(markWarm)
+      invoke('prerender_pages', {
+        path: fullPath,
+        pages: toPrerender,
+        width: currentWidth,
+        dpr,
+      }).then(markWarm).catch(markWarm)
+    }, 150)
+    return () => clearTimeout(timer)
   }, [visibleRange, layoutWidth, fullPath, dpr])
 
   // Notify parent of page changes
@@ -366,20 +381,15 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
         fetchedPagesRef.current.add(pageNum)
       }
 
-      // Batch state updates — single re-render instead of one per page
+      // Mutate refs (no re-render) and bump tick once to invalidate pages memo
       if (newLinks.length > 0) {
-        setPageLinks((prev) => {
-          const merged = new Map(prev)
-          for (const [k, v] of newLinks) merged.set(k, v)
-          return merged
-        })
+        for (const [k, v] of newLinks) pageLinksRef.current.set(k, v)
       }
       if (newTextLayers.length > 0) {
-        setPageTextLayers((prev) => {
-          const merged = new Map(prev)
-          for (const [k, v] of newTextLayers) merged.set(k, v)
-          return merged
-        })
+        for (const [k, v] of newTextLayers) pageTextLayersRef.current.set(k, v)
+      }
+      if (newLinks.length > 0 || newTextLayers.length > 0) {
+        setFetchTick((t) => t + 1)
       }
     }, 500)
     return () => {
@@ -632,9 +642,9 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           const top = pageOffsets[pageNum - 1]
           const pageHeight =
             pageOffsets[pageNum] - pageOffsets[pageNum - 1] - PAGE_GAP
-          const links = pageLinks.get(pageNum)
+          const links = pageLinksRef.current.get(pageNum)
           const pageHighlights = highlightsForPage?.(pageNum)
-          const textLayer = pageTextLayers.get(pageNum)
+          const textLayer = pageTextLayersRef.current.get(pageNum)
 
           const isClipStart = clipStartPage === pageNum
           const inClipRange = clipStartPage != null && pageNum >= clipStartPage
@@ -659,6 +669,12 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
                   className="pdf-page-img block h-full w-full"
                   draggable={false}
                   style={{ position: 'relative', zIndex: 0 }}
+                  onError={() => {
+                    // Protocol handler returned 503 (render busy) or cache miss.
+                    // Clear warm entry so prewarm pipeline retries.
+                    warmPagesRef.current.delete(`${pageNum}:${Math.round(layoutWidth)}`)
+                    setWarmTick((t) => t + 1)
+                  }}
                 />
               ) : (
                 <div
@@ -712,7 +728,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           )
         },
       ),
-    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, pageLinks, pageTextLayers, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage, snipMode, onSnipRegion, warmTick],
+    [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, fetchTick, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage, snipMode, onSnipRegion, warmTick],
   )
 
   return (

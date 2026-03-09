@@ -4,6 +4,7 @@ import type { BookProgress, ProgressMap } from '../types/progress'
 
 export function useProgress(dirPaths: string[] = []) {
   const [progress, setProgress] = useState<ProgressMap>({})
+  const [loaded, setLoaded] = useState(dirPaths.length === 0)
   const progressRef = useRef<ProgressMap>({})
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -26,6 +27,7 @@ export function useProgress(dirPaths: string[] = []) {
       for (const map of maps) Object.assign(merged, map)
       setProgress(merged)
       progressRef.current = merged
+      setLoaded(true)
     })
 
     return () => { cancelled = true }
@@ -64,5 +66,5 @@ export function useProgress(dirPaths: string[] = []) {
     }
   }, [])
 
-  return { progress, update }
+  return { progress, update, loaded }
 }

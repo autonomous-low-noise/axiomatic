@@ -194,6 +194,84 @@ describe('LoopCarousel', () => {
     expect(onExit).toHaveBeenCalledTimes(1)
   })
 
+  it('viewMode shows image immediately without Reveal button', async () => {
+    const snips = [makeSnip({ label: 'View Card' })]
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={vi.fn().mockResolvedValue(0)}
+        onExit={vi.fn()}
+        shuffled={false}
+        viewMode={true}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('View Card')).toBeInTheDocument()
+    })
+
+    // No Reveal button — image shown immediately
+    expect(screen.queryByText('Reveal')).not.toBeInTheDocument()
+  })
+
+  it('viewMode skips XP on advance', async () => {
+    const snips = [
+      makeSnip({ id: 'snip-1', label: 'Card 1' }),
+      makeSnip({ id: 'snip-2', label: 'Card 2' }),
+    ]
+    const onIncrementXp = vi.fn().mockResolvedValue(1)
+
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={onIncrementXp}
+        onExit={vi.fn()}
+        shuffled={false}
+        viewMode={true}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Card 1')).toBeInTheDocument()
+    })
+
+    // Press j to advance
+    fireEvent.keyDown(window, { key: 'j' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Card 2')).toBeInTheDocument()
+    })
+
+    // XP should NOT have been called
+    expect(onIncrementXp).not.toHaveBeenCalled()
+  })
+
+  it('initialIndex starts at correct snip', async () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'First' }),
+      makeSnip({ id: 's2', label: 'Second' }),
+      makeSnip({ id: 's3', label: 'Third' }),
+    ]
+
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={vi.fn().mockResolvedValue(0)}
+        onExit={vi.fn()}
+        shuffled={false}
+        initialIndex={1}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Second')).toBeInTheDocument()
+    })
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+  })
+
   it('XP counter updates after navigation', async () => {
     const snips = [
       makeSnip({ id: 'snip-1', label: 'A' }),

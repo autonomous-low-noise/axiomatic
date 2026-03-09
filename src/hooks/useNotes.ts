@@ -5,7 +5,7 @@ type NoteCache = Map<string, string>
 
 let cache: NoteCache = new Map()
 let listeners: Array<() => void> = []
-let snapshot = cache
+let revision = 0
 
 function subscribe(cb: () => void) {
   listeners = [...listeners, cb]
@@ -15,7 +15,7 @@ function subscribe(cb: () => void) {
 }
 
 function emitChange() {
-  snapshot = new Map(cache)
+  revision += 1
   for (const l of listeners) l()
 }
 
@@ -25,13 +25,24 @@ function cacheKey(slug: string, page: number) {
 
 const pendingFetches = new Set<string>()
 
-export function useNotes() {
-  const notes = useSyncExternalStore(
+/**
+ * Selective subscription: only re-renders when the specific note changes.
+ * Returns `undefined` while loading, `string` when loaded.
+ */
+export function useNoteContent(slug: string | undefined, page: number): string | undefined {
+  const key = slug ? cacheKey(slug, page) : ''
+  return useSyncExternalStore(
     subscribe,
-    () => snapshot,
-    () => new Map() as NoteCache,
+    () => (slug ? cache.get(key) : undefined),
+    () => undefined,
   )
+}
 
+/**
+ * Returns stable callbacks for managing notes.
+ * Does NOT subscribe to the store — use `useNoteContent` to read.
+ */
+export function useNotes() {
   const debounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
@@ -40,26 +51,19 @@ export function useNotes() {
     }
   }, [])
 
-  const getNote = useCallback(
-    (slug: string, page: number): string => {
+  const ensureNote = useCallback(
+    (slug: string, page: number): void => {
       const key = cacheKey(slug, page)
-      if (cache.has(key)) {
-        return cache.get(key)!
-      }
-      // Trigger async fetch if not already pending
-      if (!pendingFetches.has(key)) {
-        pendingFetches.add(key)
-        getNoteSql(slug, page).then((record) => {
-          pendingFetches.delete(key)
-          const content = record?.content ?? ''
-          cache.set(key, content)
-          emitChange()
-        })
-      }
-      return ''
+      if (cache.has(key) || pendingFetches.has(key)) return
+      pendingFetches.add(key)
+      getNoteSql(slug, page).then((record) => {
+        pendingFetches.delete(key)
+        const content = record?.content ?? ''
+        cache.set(key, content)
+        emitChange()
+      })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [notes],
+    [],
   )
 
   const setNote = useCallback(
@@ -83,5 +87,5 @@ export function useNotes() {
     [],
   )
 
-  return { notes, setNote, getNote }
+  return { ensureNote, setNote }
 }

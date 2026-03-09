@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { buildBoundaries, moveDown, moveUp, moveLeft, moveRight } from '../lib/grid-nav'
+import {
+  navDown, navUp, navLeftSec, navRightSec, selToTileIndex,
+  type NavSection, type NavSel, type NavAction,
+} from '../lib/grid-nav'
+
+export type { NavSection }
 
 function getColumnsFromGrid(grid: HTMLDivElement | null): number {
   if (grid) {
@@ -13,10 +18,20 @@ function getColumnsFromGrid(grid: HTMLDivElement | null): number {
 export function useVimOverview(
   slugs: string[],
   gridRef: React.RefObject<HTMLDivElement | null>,
-  sectionSizes: number[],
+  sections: NavSection[],
+  onToggleSection: (key: string) => void,
 ) {
-  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [sel, setSel] = useState<NavSel>({ kind: 'none' })
   const navigate = useNavigate()
+
+  // Refs keep latest values accessible in the handler without
+  // re-registering it on every state change.
+  const selRef = useRef(sel)
+  selRef.current = sel
+  const sectionsRef = useRef(sections)
+  sectionsRef.current = sections
+  const slugsRef = useRef(slugs)
+  slugsRef.current = slugs
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -24,40 +39,60 @@ export function useVimOverview(
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
       const cols = getColumnsFromGrid(gridRef.current)
-      const count = slugs.length
-      if (count === 0) return
-
-      const boundaries = buildBoundaries(sectionSizes)
+      const secs = sectionsRef.current
+      if (secs.length === 0) return
 
       switch (e.key) {
         case 'ArrowDown':
         case 'j': {
           e.preventDefault()
-          setSelectedIndex((prev) => moveDown(prev, cols, boundaries, count))
+          setSel((prev) => navDown(prev, cols, secs))
           break
         }
         case 'ArrowUp':
         case 'k': {
           e.preventDefault()
-          setSelectedIndex((prev) => moveUp(prev, cols, boundaries, count))
+          setSel((prev) => navUp(prev, cols, secs))
           break
         }
         case 'ArrowLeft':
         case 'h': {
           e.preventDefault()
-          setSelectedIndex((prev) => moveLeft(prev, cols, boundaries, count))
+          const cur = selRef.current
+          const result = navLeftSec(cur, cols, secs)
+          setSel(result.sel)
+          if (result.action?.type === 'collapse') {
+            onToggleSection(result.action.sectionKey)
+          }
           break
         }
         case 'ArrowRight':
         case 'l': {
           e.preventDefault()
-          setSelectedIndex((prev) => moveRight(prev, cols, boundaries, count))
+          const cur = selRef.current
+          const result = navRightSec(cur, cols, secs)
+          setSel(result.sel)
+          if (result.action?.type === 'expand') {
+            onToggleSection(result.action.sectionKey)
+          }
           break
         }
         case 'Enter': {
-          if (selectedIndex >= 0 && selectedIndex < count) {
+          const cur = selRef.current
+          if (cur.kind === 'tile') {
+            const idx = selToTileIndex(cur, secs)
+            const sl = slugsRef.current
+            if (idx >= 0 && idx < sl.length) {
+              e.preventDefault()
+              navigate(`/read/${sl[idx]}`)
+            }
+          } else if (cur.kind === 'header' && cur.sectionIdx < secs.length) {
             e.preventDefault()
-            navigate(`/read/${slugs[selectedIndex]}`)
+            const sec = secs[cur.sectionIdx]
+            onToggleSection(sec.key)
+            if (!sec.expanded) {
+              setSel({ kind: 'tile', sectionIdx: cur.sectionIdx, localIdx: 0 })
+            }
           }
           break
         }
@@ -66,7 +101,12 @@ export function useVimOverview(
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [slugs, sectionSizes, selectedIndex, navigate, gridRef])
+  }, [navigate, gridRef, onToggleSection])
 
-  return { selectedIndex }
+  const selectedIndex = selToTileIndex(sel, sections)
+  const selectedHeader = sel.kind === 'header' && sel.sectionIdx < sections.length
+    ? sections[sel.sectionIdx].key
+    : null
+
+  return { selectedIndex, selectedHeader }
 }

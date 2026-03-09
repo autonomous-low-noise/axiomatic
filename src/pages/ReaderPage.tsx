@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import type { EditorView } from '@codemirror/view'
 import { useTextbooks } from '../hooks/useTextbooks'
 import { useProgress } from '../hooks/useProgress'
-import { useNotes } from '../hooks/useNotes'
+import { useNotes, useNoteContent } from '../hooks/useNotes'
 import { useVimReader } from '../hooks/useVimReader'
 import { useSearch } from '../hooks/useSearch'
 import { useDocument } from '../hooks/useDocument'
@@ -19,36 +19,16 @@ import { AnnotationPanel } from '../components/AnnotationPanel'
 import { SnipBanner } from '../components/SnipBanner'
 import { setReaderSnipMode, setReaderHasSnips, setReaderZenMode, setReaderLearningTools } from '../lib/readerState'
 import { clampPanelWidths } from '../lib/layout'
-
-function makeResizeHandler(
-  setter: (w: number) => void,
-  min: number,
-  max: number,
-  side: 'left' | 'right',
-) {
-  return (e: React.MouseEvent) => {
-    e.preventDefault()
-    const onMouseMove = (ev: globalThis.MouseEvent) => {
-      const raw = side === 'left' ? ev.clientX : window.innerWidth - ev.clientX
-      setter(Math.min(max, Math.max(min, raw)))
-    }
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
-}
+import { makeResizeHandler } from '../lib/makeResizeHandler'
 
 export function ReaderPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { textbooks, loading } = useTextbooks()
-  const { getNote, setNote } = useNotes()
+  const { ensureNote, setNote } = useNotes()
   const book = textbooks.find((b) => b.slug === slug)
   const dirPaths = useMemo(() => (book ? [book.dir_path] : []), [book?.dir_path])
-  const { progress, update } = useProgress(dirPaths)
+  const { progress, update, loaded: progressLoaded } = useProgress(dirPaths)
   const bookProgress = slug ? progress[slug] : undefined
   const dirPathRef = useRef(book?.dir_path ?? '')
   useEffect(() => {
@@ -89,9 +69,10 @@ export function ReaderPage() {
   // Capture initial page once per document — don't re-evaluate when progress
   // updates during scroll, as that would bust PdfViewer's React.memo every 300ms.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stableInitialPage = useMemo(() => bookProgress?.currentPage ?? 1, [slug])
+  const stableInitialPage = useMemo(() => bookProgress?.currentPage ?? 1, [slug, progressLoaded])
 
   const [currentPage, setCurrentPage] = useState(bookProgress?.currentPage ?? 1)
+  const noteContent = useNoteContent(slug, currentPage)
   const totalPages = docInfo?.page_count ?? bookProgress?.totalPages ?? 0
   const [zoom, setZoom] = useState(1)
   const zoomRef = useRef(1)
@@ -111,25 +92,36 @@ export function ReaderPage() {
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView | null>(null)
 
+  // Refs for panel widths — read inside resize handler without
+  // re-registering the listener on every width change.
+  const outlineWidthRef = useRef(outlinePaneWidth)
+  outlineWidthRef.current = outlinePaneWidth
+  const notesWidthRef = useRef(notesPaneWidth)
+  notesWidthRef.current = notesPaneWidth
+  const highlightsWidthRef = useRef(highlightsPaneWidth)
+  highlightsWidthRef.current = highlightsPaneWidth
+  const bookmarksWidthRef = useRef(bookmarksPaneWidth)
+  bookmarksWidthRef.current = bookmarksPaneWidth
+
   // Clamp panel widths on window resize
   useEffect(() => {
     const handleResize = () => {
       const w = window.innerWidth
       const panels: Record<string, number> = {}
-      if (outlineOpen) panels.outline = outlinePaneWidth
-      if (notesOpen) panels.notes = notesPaneWidth
-      if (highlightsOpen) panels.highlights = highlightsPaneWidth
-      if (bookmarksOpen) panels.bookmarks = bookmarksPaneWidth
+      if (outlineOpen) panels.outline = outlineWidthRef.current
+      if (notesOpen) panels.notes = notesWidthRef.current
+      if (highlightsOpen) panels.highlights = highlightsWidthRef.current
+      if (bookmarksOpen) panels.bookmarks = bookmarksWidthRef.current
 
       const clamped = clampPanelWidths(w, panels)
-      if (clamped.outline !== undefined && clamped.outline !== outlinePaneWidth) setOutlinePaneWidth(clamped.outline)
-      if (clamped.notes !== undefined && clamped.notes !== notesPaneWidth) setNotesPaneWidth(clamped.notes)
-      if (clamped.highlights !== undefined && clamped.highlights !== highlightsPaneWidth) setHighlightsPaneWidth(clamped.highlights)
-      if (clamped.bookmarks !== undefined && clamped.bookmarks !== bookmarksPaneWidth) setBookmarksPaneWidth(clamped.bookmarks)
+      if (clamped.outline !== undefined && clamped.outline !== outlineWidthRef.current) setOutlinePaneWidth(clamped.outline)
+      if (clamped.notes !== undefined && clamped.notes !== notesWidthRef.current) setNotesPaneWidth(clamped.notes)
+      if (clamped.highlights !== undefined && clamped.highlights !== highlightsWidthRef.current) setHighlightsPaneWidth(clamped.highlights)
+      if (clamped.bookmarks !== undefined && clamped.bookmarks !== bookmarksWidthRef.current) setBookmarksPaneWidth(clamped.bookmarks)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [outlineOpen, notesOpen, highlightsOpen, bookmarksOpen, outlinePaneWidth, notesPaneWidth, highlightsPaneWidth, bookmarksPaneWidth])
+  }, [outlineOpen, notesOpen, highlightsOpen, bookmarksOpen])
 
   const zoomDisplayTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const snipToastTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -184,6 +176,11 @@ export function ReaderPage() {
   useEffect(() => {
     totalPagesRef.current = totalPages
   }, [totalPages])
+
+  // Trigger note fetch for current page (no side effects during render)
+  useEffect(() => {
+    if (slug) ensureNote(slug, currentPage)
+  }, [slug, currentPage, ensureNote])
 
   // Save totalPages to progress when docInfo loads
   useEffect(() => {
@@ -367,7 +364,7 @@ export function ReaderPage() {
     )
   }
 
-  if (docLoading || !docInfo) {
+  if (docLoading || !docInfo || !progressLoaded) {
     return (
       <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
         <p className="text-[#657b83] dark:text-[#93a1a1]">Opening document...</p>
@@ -493,7 +490,7 @@ export function ReaderPage() {
               <NotesPanel
                 slug={slug}
                 page={currentPage}
-                content={getNote(slug, currentPage)}
+                content={noteContent}
                 onUpdate={setNote}
                 externalEditorRef={editorRef}
                 width={notesPaneWidth}

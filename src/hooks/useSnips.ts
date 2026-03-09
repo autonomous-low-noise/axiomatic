@@ -149,5 +149,37 @@ export function useAllSnips(directories: Directory[]) {
     )
   }, [])
 
-  return { snips, loading, refresh, addTag, removeTag }
+  const renameSnip = useCallback(async (dirPath: string, snipId: string, newLabel: string) => {
+    await invoke('rename_snip', { dirPath, snipId, newLabel })
+    setSnips((prev) =>
+      prev.map((s) => (s.id === snipId ? { ...s, label: newLabel } : s)),
+    )
+  }, [])
+
+  const deleteSnip = useCallback(async (dirPath: string, id: string) => {
+    await invoke('delete_snip', { dirPath, id })
+    setSnips((prev) => prev.filter((s) => s.id !== id))
+  }, [])
+
+  const bulkAddTag = useCallback(async (dirPath: string, snipIds: string[], tag: string) => {
+    await invoke('bulk_add_snip_tag', { dirPath, snipIds, tag })
+    const idSet = new Set(snipIds)
+    setSnips((prev) =>
+      prev.map((s) =>
+        idSet.has(s.id) && !s.tags.includes(tag) ? { ...s, tags: [...s.tags, tag] } : s,
+      ),
+    )
+  }, [])
+
+  const bulkRemoveTag = useCallback(async (dirPath: string, snipIds: string[], tag: string) => {
+    await invoke('bulk_remove_snip_tag', { dirPath, snipIds, tag })
+    const idSet = new Set(snipIds)
+    setSnips((prev) =>
+      prev.map((s) =>
+        idSet.has(s.id) ? { ...s, tags: s.tags.filter((t) => t !== tag) } : s,
+      ),
+    )
+  }, [])
+
+  return { snips, loading, refresh, addTag, removeTag, renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag }
 }

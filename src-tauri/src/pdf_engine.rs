@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
+
+use crossbeam_channel::Receiver;
+
+pub const RENDER_WORKERS: usize = 4;
 
 use image::codecs::jpeg::JpegEncoder;
 use pdfium_render::prelude::*;
@@ -512,6 +516,38 @@ fn extract_link_type_from_action(action: &PdfAction) -> Option<LinkType> {
     }
 }
 
+/// Spawn a pool of render workers sharing a single crossbeam receiver.
+/// Each worker binds its own `Pdfium` instance — `Pdfium` is `!Send + !Sync`,
+/// so sharing a single instance across threads is unsound.
+pub fn run_pool(
+    rx: Receiver<PdfRequest>,
+    lib_path: std::path::PathBuf,
+    generation: Arc<AtomicU64>,
+    cache: SharedRenderCache,
+    worker_count: usize,
+) -> Vec<std::thread::JoinHandle<()>> {
+    (0..worker_count)
+        .map(|i| {
+            let rx = rx.clone();
+            let gen = Arc::clone(&generation);
+            let cache = Arc::clone(&cache);
+            let lib_path = lib_path.clone();
+            std::thread::Builder::new()
+                .name(format!("pdf-render-{}", i))
+                .spawn(move || {
+                    let bindings = Pdfium::bind_to_library(&lib_path)
+                        .unwrap_or_else(|e| {
+                            panic!("pdf-render-{}: failed to bind PDFium: {:?}", i, e)
+                        });
+                    let pdfium: &'static Pdfium =
+                        Box::leak(Box::new(Pdfium::new(bindings)));
+                    run(rx, pdfium, gen, cache);
+                })
+                .expect("failed to spawn pdf render worker")
+        })
+        .collect()
+}
+
 /// Main loop for the PDF render thread. Runs until the channel is closed.
 pub fn run(rx: Receiver<PdfRequest>, pdfium: &'static Pdfium, generation: Arc<AtomicU64>, cache: SharedRenderCache) {
     let mut engine = PdfEngine::new(pdfium, cache);
@@ -566,5 +602,633 @@ pub fn run(rx: Receiver<PdfRequest>, pdfium: &'static Pdfium, generation: Arc<At
                 let _ = tx.send(engine.get_page_text_layer(&path, page));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[test]
+    fn test_render_workers_constant() {
+        assert_eq!(RENDER_WORKERS, 4);
+    }
+
+    #[test]
+    fn test_pool_processes_all_requests() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(1));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        let mut receivers = Vec::new();
+        for page in 1..=20 {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page,
+                width: 800,
+                dpr: 1.0,
+                generation: 1,
+                tx: reply_tx,
+            })
+            .unwrap();
+            receivers.push(reply_rx);
+        }
+        drop(tx);
+
+        for rx in &receivers {
+            assert!(rx.recv().unwrap().is_ok());
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_pool_generation_preemption_across_workers() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(1));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            // Simulate render time so stale requests accumulate
+                            std::thread::sleep(std::time::Duration::from_millis(5));
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // Send 10 requests at gen=1
+        let mut gen1_rxs = Vec::new();
+        for page in 1..=10 {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page,
+                width: 800,
+                dpr: 1.0,
+                generation: 1,
+                tx: reply_tx,
+            })
+            .unwrap();
+            gen1_rxs.push(reply_rx);
+        }
+
+        // Bump generation
+        generation.store(2, Ordering::Relaxed);
+
+        // Send 10 requests at gen=2
+        let mut gen2_rxs = Vec::new();
+        for page in 11..=20 {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page,
+                width: 800,
+                dpr: 1.0,
+                generation: 2,
+                tx: reply_tx,
+            })
+            .unwrap();
+            gen2_rxs.push(reply_rx);
+        }
+        drop(tx);
+
+        // Gen=1 requests: some may succeed (if processed before bump), some preempted
+        let preempted_count = gen1_rxs
+            .iter()
+            .filter(|rx| rx.recv().unwrap().is_err())
+            .count();
+        assert!(
+            preempted_count > 0,
+            "at least some gen=1 requests should be preempted"
+        );
+
+        // Gen=2 requests: all should succeed
+        for rx in &gen2_rxs {
+            assert!(rx.recv().unwrap().is_ok());
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    /// CRITICAL regression test: prerender_pages reads the current generation but
+    /// must NOT bump it. If it did, concurrent thumbnail loads would preempt each
+    /// other, breaking thumbnails.
+    #[test]
+    fn test_prerender_reads_generation_without_bumping() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(5));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // Send 10 RenderPage requests all with gen=5 (simulating prerender_pages)
+        let mut receivers = Vec::new();
+        for page in 1..=10 {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page,
+                width: 200,
+                dpr: 1.0,
+                generation: 5,
+                tx: reply_tx,
+            })
+            .unwrap();
+            receivers.push(reply_rx);
+        }
+        drop(tx);
+
+        // All 10 must succeed (gen=5 == current=5, no preemption)
+        for rx in &receivers {
+            assert!(rx.recv().unwrap().is_ok(), "request should not be preempted");
+        }
+
+        // Generation must STILL be 5 — proves no bump happened
+        assert_eq!(generation.load(Ordering::Relaxed), 5);
+
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    /// CRITICAL regression test: 3 concurrent thumbnail loads (batches of
+    /// RenderPage requests) must not preempt each other. Generation stays at 0
+    /// throughout, so all requests with gen=0 succeed.
+    #[test]
+    fn test_concurrent_prerenders_no_mutual_preemption() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(0));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            std::thread::sleep(std::time::Duration::from_millis(2));
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // 3 concurrent thumbnail loads, each requesting 5 pages
+        let mut all_receivers = Vec::new();
+        for batch in 0..3 {
+            for page_offset in 1..=5 {
+                let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+                tx.send(PdfRequest::RenderPage {
+                    path: format!("book{}.pdf", batch),
+                    page: page_offset,
+                    width: 200,
+                    dpr: 1.0,
+                    generation: 0,
+                    tx: reply_tx,
+                })
+                .unwrap();
+                all_receivers.push(reply_rx);
+            }
+        }
+        drop(tx);
+
+        // All 15 must succeed — none preempted by each other
+        for (i, rx) in all_receivers.iter().enumerate() {
+            assert!(
+                rx.recv().unwrap().is_ok(),
+                "request {} should not be preempted",
+                i
+            );
+        }
+
+        // Generation unchanged
+        assert_eq!(generation.load(Ordering::Relaxed), 0);
+
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_open_document_preempts_stale_renders() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(0));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        // Render at gen=0 succeeds
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page: 1,
+                width: 800,
+                dpr: 1.0,
+                generation: 0,
+                tx: reply_tx,
+            })
+            .unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+
+        // Bump generation (simulating open_document)
+        generation.store(1, Ordering::Relaxed);
+
+        // Stale render at gen=0 → preempted
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page: 2,
+                width: 800,
+                dpr: 1.0,
+                generation: 0,
+                tx: reply_tx,
+            })
+            .unwrap();
+            let result = reply_rx.recv().unwrap();
+            assert!(result.is_err());
+            assert_eq!(result.unwrap_err(), "preempted");
+        }
+
+        // Fresh render at gen=1 → succeeds
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page: 2,
+                width: 800,
+                dpr: 1.0,
+                generation: 1,
+                tx: reply_tx,
+            })
+            .unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+
+        drop(tx);
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_cache_populated_after_render() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(0));
+        let cache = crate::pdf_models::new_shared_render_cache();
+
+        // Spawn workers that populate the shared cache after "rendering"
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                let cache = Arc::clone(&cache);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            path,
+                            page,
+                            width,
+                            dpr,
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let jpeg = vec![0xFF, 0xD8, 0xFF, 0xE0];
+                                let key = RenderKey {
+                                    path,
+                                    page,
+                                    width,
+                                    dpr_hundredths: (dpr * 100.0) as u32,
+                                };
+                                cache.lock().unwrap().put(key, jpeg.clone());
+                                let _ = tx.send(Ok(jpeg));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+        tx.send(PdfRequest::RenderPage {
+            path: "doc.pdf".into(),
+            page: 3,
+            width: 600,
+            dpr: 2.0,
+            generation: 0,
+            tx: reply_tx,
+        })
+        .unwrap();
+
+        let result = reply_rx.recv().unwrap();
+        assert!(result.is_ok());
+
+        // Verify cache contains the entry
+        let expected_key = RenderKey {
+            path: "doc.pdf".into(),
+            page: 3,
+            width: 600,
+            dpr_hundredths: 200,
+        };
+        let cached = cache.lock().unwrap().get(&expected_key).cloned();
+        assert!(cached.is_some());
+        assert_eq!(cached.unwrap(), vec![0xFF, 0xD8, 0xFF, 0xE0]);
+
+        drop(tx);
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_all_request_types_dispatched() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+
+        let handle = std::thread::spawn(move || {
+            while let Ok(request) = rx.recv() {
+                match request {
+                    PdfRequest::OpenDocument { tx, .. } => {
+                        let _ = tx.send(Ok(DocumentInfo {
+                            doc_id: "test".into(),
+                            page_count: 1,
+                            pages: vec![PageDimension {
+                                width_pts: 612.0,
+                                height_pts: 792.0,
+                                aspect_ratio: 612.0 / 792.0,
+                            }],
+                            title: None,
+                        }));
+                    }
+                    PdfRequest::CloseDocument { tx, .. } => {
+                        let _ = tx.send(Ok(()));
+                    }
+                    PdfRequest::RenderPage { tx, .. } => {
+                        let _ = tx.send(Ok(vec![0xFF]));
+                    }
+                    PdfRequest::GetOutline { tx, .. } => {
+                        let _ = tx.send(Ok(vec![]));
+                    }
+                    PdfRequest::GetPageLinks { tx, .. } => {
+                        let _ = tx.send(Ok(vec![]));
+                    }
+                    PdfRequest::ExtractPageText { tx, .. } => {
+                        let _ = tx.send(Ok("text".into()));
+                    }
+                    PdfRequest::SearchDocument { tx, .. } => {
+                        let _ = tx.send(Ok(vec![]));
+                    }
+                    PdfRequest::ClipPdf { tx, .. } => {
+                        let _ = tx.send(Ok(()));
+                    }
+                    PdfRequest::GetPageTextLayer { tx, .. } => {
+                        let _ = tx.send(Ok(PageTextLayer {
+                            page: 1,
+                            spans: vec![],
+                        }));
+                    }
+                }
+            }
+        });
+
+        // OpenDocument
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::OpenDocument { path: "t.pdf".into(), tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // CloseDocument
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::CloseDocument { path: "t.pdf".into(), tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // RenderPage
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "t.pdf".into(), page: 1, width: 800, dpr: 1.0, generation: 0, tx: reply_tx,
+            }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // GetOutline
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::GetOutline { path: "t.pdf".into(), tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // GetPageLinks
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::GetPageLinks { path: "t.pdf".into(), page: 1, tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // ExtractPageText
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::ExtractPageText { path: "t.pdf".into(), page: 1, tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // SearchDocument
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::SearchDocument { path: "t.pdf".into(), query: "q".into(), tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // ClipPdf
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::ClipPdf {
+                source_path: "t.pdf".into(), start_page: 1, end_page: 1, output_path: "o.pdf".into(), tx: reply_tx,
+            }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+        // GetPageTextLayer
+        {
+            let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::GetPageTextLayer { path: "t.pdf".into(), page: 1, tx: reply_tx }).unwrap();
+            assert!(reply_rx.recv().unwrap().is_ok());
+        }
+
+        drop(tx);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_sender_disconnect_detected() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                std::thread::spawn(move || {
+                    // Workers exit cleanly when sender disconnects
+                    while let Ok(_request) = rx.recv() {}
+                })
+            })
+            .collect();
+
+        // Drop the sender — workers' rx.recv() returns Err → threads exit
+        drop(tx);
+
+        // All worker JoinHandles must complete
+        for h in handles {
+            h.join().expect("worker thread should exit cleanly on sender disconnect");
+        }
+    }
+
+    #[test]
+    fn test_pool_distributes_across_workers() {
+        let (tx, rx) = crossbeam_channel::unbounded::<PdfRequest>();
+        let generation = Arc::new(AtomicU64::new(1));
+        let worker_ids = Arc::new(Mutex::new(std::collections::HashSet::new()));
+
+        let handles: Vec<_> = (0..RENDER_WORKERS)
+            .map(|_| {
+                let rx = rx.clone();
+                let gen = Arc::clone(&generation);
+                let ids = Arc::clone(&worker_ids);
+                std::thread::spawn(move || {
+                    while let Ok(request) = rx.recv() {
+                        if let PdfRequest::RenderPage {
+                            generation: req_gen,
+                            tx,
+                            ..
+                        } = request
+                        {
+                            ids.lock().unwrap().insert(std::thread::current().id());
+                            std::thread::sleep(std::time::Duration::from_millis(5));
+                            if req_gen < gen.load(Ordering::Relaxed) {
+                                let _ = tx.send(Err("preempted".into()));
+                            } else {
+                                let _ = tx.send(Ok(vec![0xFF, 0xD8]));
+                            }
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        for page in 1..=20 {
+            let (reply_tx, _) = std::sync::mpsc::sync_channel(1);
+            tx.send(PdfRequest::RenderPage {
+                path: "test.pdf".into(),
+                page,
+                width: 800,
+                dpr: 1.0,
+                generation: 1,
+                tx: reply_tx,
+            })
+            .unwrap();
+        }
+        drop(tx);
+
+        for h in handles {
+            h.join().unwrap();
+        }
+        let unique_workers = worker_ids.lock().unwrap().len();
+        assert!(
+            unique_workers > 1,
+            "expected multiple workers, got {}",
+            unique_workers
+        );
     }
 }

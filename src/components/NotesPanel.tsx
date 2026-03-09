@@ -44,7 +44,7 @@ const relativeLineNumbers = gutter({
 interface Props {
   slug: string
   page: number
-  content: string
+  content: string | undefined
   onUpdate: (slug: string, page: number, content: string) => void
   externalEditorRef?: React.RefObject<EditorView | null>
   width?: number
@@ -53,8 +53,9 @@ interface Props {
 export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, width }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  const currentKeyRef = useRef(`${slug}:${page}`)
+  const lastLoadedKeyRef = useRef('')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const suppressSaveRef = useRef(false)
   const contextRef = useRef({ slug, page })
   const onUpdateRef = useRef(onUpdate)
   const themeCompartmentRef = useRef(new Compartment())
@@ -78,6 +79,7 @@ export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, w
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (!update.docChanged) return
+      if (suppressSaveRef.current) return
       const doc = update.state.doc.toString()
       const ctx = contextRef.current
       if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -96,7 +98,7 @@ export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, w
     })
 
     const state = EditorState.create({
-      doc: content,
+      doc: content ?? '',
       extensions: [
         vim(),
         relativeLineNumbers,
@@ -140,26 +142,30 @@ export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, w
     })
   }, [isDark])
 
-  // Tell CodeMirror to remeasure when panel width changes
+  // Tell CodeMirror to remeasure when panel width changes (debounced via RAF)
   useEffect(() => {
-    viewRef.current?.requestMeasure()
+    const id = requestAnimationFrame(() => viewRef.current?.requestMeasure())
+    return () => cancelAnimationFrame(id)
   }, [width])
 
-  // Update content when slug/page changes
+  // Update editor content when page changes or content finishes loading.
+  // Suppresses the save listener to prevent writing stale/empty content.
   useEffect(() => {
+    const view = viewRef.current
+    if (!view || content === undefined) return
+
     const newKey = `${slug}:${page}`
-    if (newKey !== currentKeyRef.current) {
-      currentKeyRef.current = newKey
-      const view = viewRef.current
-      if (view) {
-        view.dispatch({
-          changes: {
-            from: 0,
-            to: view.state.doc.length,
-            insert: content,
-          },
-        })
-      }
+    if (newKey !== lastLoadedKeyRef.current) {
+      lastLoadedKeyRef.current = newKey
+      suppressSaveRef.current = true
+      view.dispatch({
+        changes: {
+          from: 0,
+          to: view.state.doc.length,
+          insert: content,
+        },
+      })
+      suppressSaveRef.current = false
     }
   }, [slug, page, content])
 

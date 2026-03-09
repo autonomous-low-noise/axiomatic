@@ -1,4 +1,6 @@
+import { invoke } from '@tauri-apps/api/core'
 import { memo, useEffect, useRef, useState } from 'react'
+import { acquireSlot } from '../lib/thumbnail-queue'
 import type { DocumentInfo } from '../hooks/useDocument'
 
 interface Props {
@@ -22,6 +24,7 @@ const PageTile = memo(function PageTile({
   onNavigate: (page: number) => void
 }) {
   const [visible, setVisible] = useState(false)
+  const [cached, setCached] = useState(false)
   const ref = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -40,6 +43,31 @@ const PageTile = memo(function PageTile({
     return () => observer.disconnect()
   }, [])
 
+  // Acquire slot → prerender → release slot → show <img>
+  useEffect(() => {
+    if (!visible) return
+    let cancelled = false
+
+    acquireSlot().then((release) => {
+      if (cancelled) {
+        release()
+        return
+      }
+      invoke('prerender_pages', { path: fullPath, pages: [pageNum], width: 120, dpr: 1 })
+        .then(() => {
+          if (!cancelled) setCached(true)
+        })
+        .catch(() => {
+          if (!cancelled) setCached(true)
+        })
+        .finally(() => release())
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [visible, fullPath, pageNum])
+
   const tileWidth = 120
   const tileHeight = tileWidth / aspectRatio
   const encodedPath = encodeURIComponent(fullPath)
@@ -55,7 +83,7 @@ const PageTile = memo(function PageTile({
       }`}
       style={{ width: tileWidth, height: tileHeight }}
     >
-      {visible ? (
+      {visible && cached ? (
         <img
           src={`pdfium://localhost/render?path=${encodedPath}&page=${pageNum}&width=${tileWidth}&dpr=1`}
           width={tileWidth}
@@ -81,7 +109,7 @@ const PageTile = memo(function PageTile({
   )
 })
 
-export function OutlineSidebar({ docInfo, fullPath, currentPage, onNavigate }: Props) {
+export const OutlineSidebar = memo(function OutlineSidebar({ docInfo, fullPath, currentPage, onNavigate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Scroll the current page tile into view when the sidebar opens or page changes
@@ -110,4 +138,4 @@ export function OutlineSidebar({ docInfo, fullPath, currentPage, onNavigate }: P
       })}
     </div>
   )
-}
+})

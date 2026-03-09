@@ -15,7 +15,7 @@ use pdf_commands::PdfState;
 use pdf_models::new_shared_render_cache;
 use pdfium_render::prelude::*;
 use std::sync::atomic::AtomicU64;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 fn find_pdf_in_args(args: &[String]) -> Option<String> {
@@ -58,8 +58,8 @@ fn pdfium_lib_name() -> &'static str {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let (tx, rx) = mpsc::channel::<pdf_engine::PdfRequest>();
-    let tx_protocol = Mutex::new(tx.clone());
+    let (tx, rx) = crossbeam_channel::unbounded::<pdf_engine::PdfRequest>();
+    let tx_protocol = tx.clone();
     let generation = Arc::new(AtomicU64::new(0));
     let gen_protocol = Arc::clone(&generation);
     let gen_render = Arc::clone(&generation);
@@ -77,8 +77,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .register_uri_scheme_protocol("pdfium", move |_ctx, request| {
-            pdf_protocol::handle(&tx_protocol, &gen_protocol, &cache_protocol, request)
+        .register_asynchronous_uri_scheme_protocol("pdfium", move |_ctx, request, responder| {
+            pdf_protocol::handle_async(&tx_protocol, &gen_protocol, &cache_protocol, request, responder)
         })
         .setup(move |app| {
             if cfg!(debug_assertions) {
@@ -140,26 +140,22 @@ pub fn run() {
 
             log::info!("Loading PDFium from {:?}", lib_path);
 
-            // Initialize PDFium eagerly so it's available to both the
-            // render thread and the open_document command handler.
-            let bindings = Pdfium::bind_to_library(&lib_path)
+            // Verify PDFium library can be loaded (fail fast with clear error).
+            Pdfium::bind_to_library(&lib_path)
                 .map_err(|e| {
                     log::error!("Failed to bind to PDFium library at {:?}: {:?}", lib_path, e);
                     format!("Failed to bind to PDFium: {:?}", e)
                 })?;
-            let pdfium: &'static Pdfium = Box::leak(Box::new(Pdfium::new(bindings)));
-            log::info!("PDFium initialized");
+            log::info!("PDFium library verified");
 
-            // Spawn the PDF render thread.
-            // pdfium is 'static (leaked) — cast to usize so the closure is Send.
-            let pdfium_addr = pdfium as *const Pdfium as usize;
-            std::thread::spawn(move || {
-                let pdfium: &'static Pdfium = unsafe { &*(pdfium_addr as *const Pdfium) };
-                pdf_engine::run(rx, pdfium, gen_render, cache_render);
-            });
+            // Spawn the PDF render worker pool.
+            // Each worker creates its own Pdfium instance (Pdfium is !Send+!Sync).
+            let _render_workers = pdf_engine::run_pool(
+                rx, lib_path, gen_render, cache_render, pdf_engine::RENDER_WORKERS,
+            );
 
             app.manage(PdfState {
-                sender: Mutex::new(tx),
+                sender: tx,
                 generation,
             });
 
@@ -221,6 +217,14 @@ pub fn run() {
             snip_commands::add_snip_tag,
             snip_commands::remove_snip_tag,
             snip_commands::list_all_snip_tags,
+            snip_commands::rename_snip,
+            snip_commands::bulk_add_snip_tag,
+            snip_commands::bulk_remove_snip_tag,
+            snip_commands::list_snip_tag_defs,
+            snip_commands::create_snip_tag_def,
+            snip_commands::delete_snip_tag_def,
+            snip_commands::rename_snip_tag_def,
+            snip_commands::recolor_snip_tag_def,
             session_commands::log_study_session,
             session_commands::increment_pomodoro_xp,
             session_commands::get_pomodoro_xp,

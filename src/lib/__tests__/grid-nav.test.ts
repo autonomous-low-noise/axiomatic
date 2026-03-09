@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildBoundaries, findSection, moveDown, moveUp, moveLeft, moveRight } from '../grid-nav'
+import {
+  buildBoundaries, findSection, moveDown, moveUp, moveLeft, moveRight,
+  navDown, navUp, navLeftSec, navRightSec, selToTileIndex,
+  type NavSection, type NavSel,
+} from '../grid-nav'
 
 // Test grid layout:
 // Section 0 (starred): 3 items  → indices 0, 1, 2
@@ -172,5 +176,287 @@ describe('moveRight', () => {
 
   it('stays at last item', () => {
     expect(moveRight(11, cols, boundaries, count)).toBe(11)
+  })
+})
+
+// === Header-aware nav tests ===
+//
+// Mixed layout (3 cols):
+//   Section 0 (starred, expanded, 3 tiles):  [0] [1] [2]
+//   Section 1 (dir-1,   collapsed, 5 tiles):  <header>
+//   Section 2 (dir-2,   expanded, 4 tiles):  [0] [1] [2]
+//                                             [3]
+//
+// slugs (expanded only): starred tiles 0–2, dir-2 tiles 3–6
+//   flat indices: starred 0,1,2  dir-2 3,4,5,6
+
+const mixed: NavSection[] = [
+  { key: 'starred', expanded: true, tileCount: 3 },
+  { key: 'dir-1', expanded: false, tileCount: 5 },
+  { key: 'dir-2', expanded: true, tileCount: 4 },
+]
+const navCols = 3
+
+describe('selToTileIndex', () => {
+  it('returns flat index for tile in first expanded section', () => {
+    expect(selToTileIndex({ kind: 'tile', sectionIdx: 0, localIdx: 1 }, mixed)).toBe(1)
+  })
+
+  it('skips collapsed sections when computing flat index', () => {
+    // dir-2 is section 2, but section 1 is collapsed (0 tiles in slugs)
+    expect(selToTileIndex({ kind: 'tile', sectionIdx: 2, localIdx: 0 }, mixed)).toBe(3)
+    expect(selToTileIndex({ kind: 'tile', sectionIdx: 2, localIdx: 2 }, mixed)).toBe(5)
+  })
+
+  it('returns -1 for header', () => {
+    expect(selToTileIndex({ kind: 'header', sectionIdx: 1 }, mixed)).toBe(-1)
+  })
+
+  it('returns -1 for none', () => {
+    expect(selToTileIndex({ kind: 'none' }, mixed)).toBe(-1)
+  })
+})
+
+describe('navDown (header-aware)', () => {
+  it('from none + first section expanded → first tile', () => {
+    expect(navDown({ kind: 'none' }, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 0, localIdx: 0,
+    })
+  })
+
+  it('from none + first section collapsed → first header', () => {
+    const collapsed: NavSection[] = [
+      { key: 'a', expanded: false, tileCount: 2 },
+      { key: 'b', expanded: true, tileCount: 3 },
+    ]
+    expect(navDown({ kind: 'none' }, navCols, collapsed)).toEqual({
+      kind: 'header', sectionIdx: 0,
+    })
+  })
+
+  it('from collapsed header → next section', () => {
+    // Header of dir-1 (collapsed) → dir-2 is expanded → first tile
+    const sel: NavSel = { kind: 'header', sectionIdx: 1 }
+    expect(navDown(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 2, localIdx: 0,
+    })
+  })
+
+  it('from collapsed header → next collapsed header', () => {
+    const allClosed: NavSection[] = [
+      { key: 'a', expanded: false, tileCount: 2 },
+      { key: 'b', expanded: false, tileCount: 3 },
+    ]
+    expect(navDown({ kind: 'header', sectionIdx: 0 }, navCols, allClosed)).toEqual({
+      kind: 'header', sectionIdx: 1,
+    })
+  })
+
+  it('from expanded header → first tile of section', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 0 }
+    expect(navDown(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 0, localIdx: 0,
+    })
+  })
+
+  it('tile within section moves down', () => {
+    // dir-2, localIdx 0 (row 0, col 0) → localIdx 3 (row 1, col 0)
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 0 }
+    expect(navDown(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 2, localIdx: 3,
+    })
+  })
+
+  it('tile clamps to last item when column exceeds row', () => {
+    // dir-2, localIdx 1 (row 0, col 1) → row 1 col 1 = 4, but only 4 items (indices 0-3)
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 1 }
+    expect(navDown(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 2, localIdx: 3,
+    })
+  })
+
+  it('last row of expanded → next collapsed header (not fluent)', () => {
+    // starred last row (row 0), next is collapsed dir-1
+    const sel: NavSel = { kind: 'tile', sectionIdx: 0, localIdx: 0 }
+    expect(navDown(sel, navCols, mixed)).toEqual({
+      kind: 'header', sectionIdx: 1,
+    })
+  })
+
+  it('last row of expanded → next expanded first tile (fluent)', () => {
+    const twoExpanded: NavSection[] = [
+      { key: 'a', expanded: true, tileCount: 3 },
+      { key: 'b', expanded: true, tileCount: 4 },
+    ]
+    // a, row 0 col 0 → b first tile col 0
+    expect(navDown({ kind: 'tile', sectionIdx: 0, localIdx: 0 }, navCols, twoExpanded)).toEqual({
+      kind: 'tile', sectionIdx: 1, localIdx: 0,
+    })
+  })
+
+  it('fluent cross-section preserves column', () => {
+    const twoExpanded: NavSection[] = [
+      { key: 'a', expanded: true, tileCount: 3 },
+      { key: 'b', expanded: true, tileCount: 4 },
+    ]
+    // a, col 2 → b col 2
+    expect(navDown({ kind: 'tile', sectionIdx: 0, localIdx: 2 }, navCols, twoExpanded)).toEqual({
+      kind: 'tile', sectionIdx: 1, localIdx: 2,
+    })
+  })
+
+  it('last section last row stays put', () => {
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 3 }
+    expect(navDown(sel, navCols, mixed)).toEqual(sel)
+  })
+
+  it('last collapsed header stays put', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 1 }
+    const onlyClosed: NavSection[] = [
+      { key: 'a', expanded: true, tileCount: 3 },
+      { key: 'b', expanded: false, tileCount: 5 },
+    ]
+    expect(navDown(sel, navCols, onlyClosed)).toEqual(sel)
+  })
+})
+
+describe('navUp (header-aware)', () => {
+  it('from none stays none', () => {
+    expect(navUp({ kind: 'none' }, navCols, mixed)).toEqual({ kind: 'none' })
+  })
+
+  it('header + prev expanded → last tile matching column', () => {
+    // dir-1 header, prev is starred (expanded, 3 tiles, 1 row of 3)
+    const sel: NavSel = { kind: 'header', sectionIdx: 1 }
+    // col defaults to 0 for headers
+    expect(navUp(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 0, localIdx: 0,
+    })
+  })
+
+  it('header + prev collapsed → prev header', () => {
+    const twoClosed: NavSection[] = [
+      { key: 'a', expanded: false, tileCount: 2 },
+      { key: 'b', expanded: false, tileCount: 3 },
+    ]
+    expect(navUp({ kind: 'header', sectionIdx: 1 }, navCols, twoClosed)).toEqual({
+      kind: 'header', sectionIdx: 0,
+    })
+  })
+
+  it('first header stays put', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 0 }
+    const sections: NavSection[] = [{ key: 'a', expanded: false, tileCount: 2 }]
+    expect(navUp(sel, navCols, sections)).toEqual(sel)
+  })
+
+  it('tile moves up within section', () => {
+    // dir-2, localIdx 3 (row 1) → localIdx 0 (row 0)
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 3 }
+    expect(navUp(sel, navCols, mixed)).toEqual({
+      kind: 'tile', sectionIdx: 2, localIdx: 0,
+    })
+  })
+
+  it('first row + prev collapsed → prev header', () => {
+    // dir-2 first row, prev is dir-1 (collapsed)
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 0 }
+    expect(navUp(sel, navCols, mixed)).toEqual({
+      kind: 'header', sectionIdx: 1,
+    })
+  })
+
+  it('first row + prev expanded → last tile matching column (fluent)', () => {
+    const twoExpanded: NavSection[] = [
+      { key: 'a', expanded: true, tileCount: 5 }, // 2 rows: [0,1,2] [3,4]
+      { key: 'b', expanded: true, tileCount: 3 },
+    ]
+    // b, row 0 col 1 → a last row col 1 = localIdx 4
+    expect(navUp({ kind: 'tile', sectionIdx: 1, localIdx: 1 }, navCols, twoExpanded)).toEqual({
+      kind: 'tile', sectionIdx: 0, localIdx: 4,
+    })
+  })
+
+  it('first row + prev expanded clamps column', () => {
+    const twoExpanded: NavSection[] = [
+      { key: 'a', expanded: true, tileCount: 4 }, // 2 rows: [0,1,2] [3]
+      { key: 'b', expanded: true, tileCount: 3 },
+    ]
+    // b, row 0 col 2 → a last row col 2, but last row only has 1 item → clamp to 3
+    expect(navUp({ kind: 'tile', sectionIdx: 1, localIdx: 2 }, navCols, twoExpanded)).toEqual({
+      kind: 'tile', sectionIdx: 0, localIdx: 3,
+    })
+  })
+
+  it('first tile of first section stays put', () => {
+    const sel: NavSel = { kind: 'tile', sectionIdx: 0, localIdx: 0 }
+    expect(navUp(sel, navCols, mixed)).toEqual(sel)
+  })
+})
+
+describe('navLeftSec', () => {
+  it('tile col > 0 moves left, no action', () => {
+    const result = navLeftSec({ kind: 'tile', sectionIdx: 0, localIdx: 1 }, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'tile', sectionIdx: 0, localIdx: 0 })
+    expect(result.action).toBeUndefined()
+  })
+
+  it('tile col 0 of expanded section → header + collapse action', () => {
+    const sel: NavSel = { kind: 'tile', sectionIdx: 0, localIdx: 0 }
+    const result = navLeftSec(sel, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'header', sectionIdx: 0 })
+    expect(result.action).toEqual({ type: 'collapse', sectionKey: 'starred' })
+  })
+
+  it('tile col 0 row > 0 also collapses', () => {
+    // localIdx 3 = row 1 col 0 in a 3-col grid
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 3 }
+    const result = navLeftSec(sel, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'header', sectionIdx: 2 })
+    expect(result.action).toEqual({ type: 'collapse', sectionKey: 'dir-2' })
+  })
+
+  it('header stays put (no-op)', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 1 }
+    const result = navLeftSec(sel, navCols, mixed)
+    expect(result.sel).toEqual(sel)
+    expect(result.action).toBeUndefined()
+  })
+})
+
+describe('navRightSec', () => {
+  it('collapsed header returns expand action + first tile', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 1 }
+    const result = navRightSec(sel, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'tile', sectionIdx: 1, localIdx: 0 })
+    expect(result.action).toEqual({ type: 'expand', sectionKey: 'dir-1' })
+  })
+
+  it('expanded header → first tile, no action', () => {
+    const sel: NavSel = { kind: 'header', sectionIdx: 0 }
+    const result = navRightSec(sel, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'tile', sectionIdx: 0, localIdx: 0 })
+    expect(result.action).toBeUndefined()
+  })
+
+  it('tile not at row end moves right', () => {
+    const sel: NavSel = { kind: 'tile', sectionIdx: 0, localIdx: 0 }
+    const result = navRightSec(sel, navCols, mixed)
+    expect(result.sel).toEqual({ kind: 'tile', sectionIdx: 0, localIdx: 1 })
+    expect(result.action).toBeUndefined()
+  })
+
+  it('tile at row end stays put', () => {
+    // col 2 = last col
+    const sel: NavSel = { kind: 'tile', sectionIdx: 0, localIdx: 2 }
+    const result = navRightSec(sel, navCols, mixed)
+    expect(result.sel).toEqual(sel)
+  })
+
+  it('tile at end of section stays put', () => {
+    // dir-2 has 4 tiles, localIdx 3 is last
+    const sel: NavSel = { kind: 'tile', sectionIdx: 2, localIdx: 3 }
+    const result = navRightSec(sel, navCols, mixed)
+    expect(result.sel).toEqual(sel)
   })
 })

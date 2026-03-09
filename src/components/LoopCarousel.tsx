@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Snip } from '../hooks/useSnips'
+import { SnipImage } from './SnipImage'
 
 interface LoopCarouselProps {
   snips: Snip[]
@@ -11,6 +12,10 @@ interface LoopCarouselProps {
    *  is called instead of onIncrementXp so that XP is credited to the correct
    *  directory + slug combination. */
   onIncrementXpForSnip?: (dirPath: string, slug: string) => Promise<void>
+  /** When true: images always revealed, no XP tracking */
+  viewMode?: boolean
+  /** Start at this index instead of 0 */
+  initialIndex?: number
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -22,36 +27,6 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-function SnipImage({ snip }: { snip: Snip }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const encodedPath = encodeURIComponent(snip.full_path)
-    const url = `pdfium://localhost/render?path=${encodedPath}&page=${snip.page}&width=800&dpr=2`
-    const img = new Image()
-    img.onload = () => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const sx = Math.round(snip.x * img.naturalWidth)
-      const sy = Math.round(snip.y * img.naturalHeight)
-      const sw = Math.round(snip.width * img.naturalWidth)
-      const sh = Math.round(snip.height * img.naturalHeight)
-      canvas.width = sw
-      canvas.height = sh
-      const ctx = canvas.getContext('2d')
-      if (ctx) ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
-    }
-    img.src = url
-  }, [snip])
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="mt-4 max-h-[60vh] max-w-full rounded border border-[#eee8d5] object-contain dark:border-[#073642]"
-    />
-  )
-}
-
 export function LoopCarousel({
   snips,
   xp,
@@ -59,6 +34,8 @@ export function LoopCarousel({
   onExit,
   shuffled,
   onIncrementXpForSnip,
+  viewMode,
+  initialIndex,
 }: LoopCarouselProps) {
   // Stabilize order: only compute once when snips first arrive (avoids
   // re-shuffling mid-session if the snips array reference changes).
@@ -71,8 +48,8 @@ export function LoopCarousel({
     }
   }, [snips, shuffled])
 
-  const [index, setIndex] = useState(0)
-  const [revealed, setRevealed] = useState(false)
+  const [index, setIndex] = useState(initialIndex ?? 0)
+  const [revealed, setRevealed] = useState(viewMode === true)
   const [displayXp, setDisplayXp] = useState(xp)
 
   const current = orderedSnips[index]
@@ -83,6 +60,7 @@ export function LoopCarousel({
   }, [revealed])
 
   const advance = useCallback(async (snip: Snip) => {
+    if (viewMode) return
     if (onIncrementXpForSnip) {
       // Cross-book mode: increment XP for the specific snip's slug/dir.
       // The snip object is actually a SnipWithDir at runtime when this
@@ -95,19 +73,19 @@ export function LoopCarousel({
       const newXp = await onIncrementXp()
       if (newXp != null) setDisplayXp(newXp)
     }
-  }, [onIncrementXp, onIncrementXpForSnip])
+  }, [onIncrementXp, onIncrementXpForSnip, viewMode])
 
   const handleNext = useCallback(() => {
     const currentSnip = orderedSnips[index]
     setIndex((i) => (i + 1) % orderedSnips.length)
-    setRevealed(false)
+    if (!viewMode) setRevealed(false)
     if (currentSnip) advance(currentSnip)
-  }, [orderedSnips, index, advance])
+  }, [orderedSnips, index, advance, viewMode])
 
   const handlePrev = useCallback(() => {
     setIndex((i) => (i - 1 + orderedSnips.length) % orderedSnips.length)
-    setRevealed(false)
-  }, [orderedSnips.length])
+    if (!viewMode) setRevealed(false)
+  }, [orderedSnips.length, viewMode])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -116,6 +94,7 @@ export function LoopCarousel({
 
       switch (e.key) {
         case ' ':
+          if (viewMode) break
           e.preventDefault()
           handleReveal()
           break
@@ -154,7 +133,7 @@ export function LoopCarousel({
         <span className="text-sm text-[#93a1a1] dark:text-[#586e75]">
           {index + 1} / {orderedSnips.length}
         </span>
-        {!onIncrementXpForSnip && (
+        {!viewMode && !onIncrementXpForSnip && (
           <span className="text-sm font-medium text-[#b58900]">
             {displayXp} XP
           </span>

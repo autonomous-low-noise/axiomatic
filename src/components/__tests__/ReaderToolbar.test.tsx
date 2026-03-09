@@ -150,4 +150,21 @@ describe('ReaderToolbar', () => {
     expect(center.className).toContain('flex-1')
     expect(right.className).not.toContain('flex-1')
   })
+
+  it('title has max-width cap and ellipsis truncation', () => {
+    renderToolbar({ title: 'A Very Long Title That Should Truncate' })
+    const titleEl = screen.getByText('A Very Long Title That Should Truncate')
+    const cls = titleEl.className
+    expect(cls).toContain('truncate')
+    expect(cls).toMatch(/max-w-/)
+  })
+
+  it('side sections cannot shrink', () => {
+    const { container } = renderToolbar()
+    const toolbar = container.querySelector('[class*="h-10"]')!
+    const left = toolbar.children[0] as HTMLElement
+    const right = toolbar.children[2] as HTMLElement
+    expect(left.className).toContain('shrink-0')
+    expect(right.className).toContain('shrink-0')
+  })
 })
