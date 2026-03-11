@@ -30,7 +30,7 @@ export function SnipsPage() {
   } = useAllSnips(directories)
 
   const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
-  const { defs: tagDefs, createDef, deleteDef, renameDef, recolorDef, refresh: refreshDefs } = useSnipTagDefs(dirPaths)
+  const { defs: tagDefs, createDef, deleteDef, renameDef, recolorDef } = useSnipTagDefs(dirPaths)
 
   // Build a color lookup from tag defs
   const tagColorMap = useMemo(() => {
@@ -471,7 +471,6 @@ export function SnipsPage() {
                   <React.Fragment key={snip.id}>
                   <tr
                     data-row-index={i}
-                    data-row-index={i}
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return
                       if ((e.target as HTMLElement).closest('input[type="text"]')) return
@@ -600,7 +599,6 @@ export function SnipsPage() {
           y={contextMenu.y}
           snip={contextMenu.snip}
           tagDefs={tagDefs}
-          tagColorMap={tagColorMap}
           onView={() => {
             const idx = filteredSnips.findIndex((s) => s.id === contextMenu.snip.id)
             setViewStartIndex(idx >= 0 ? idx : 0)
@@ -697,14 +695,13 @@ export function SnipsPage() {
 
 // Extracted context menu with tag checkboxes, rename, delete
 function ContextMenu({
-  x, y, snip, tagDefs, tagColorMap,
+  x, y, snip, tagDefs,
   onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onClose,
 }: {
   x: number
   y: number
   snip: SnipWithDir
   tagDefs: { name: string; color: string }[]
-  tagColorMap: Map<string, string>
   onView: () => void
   onExpand: () => void
   onNavigate: () => void

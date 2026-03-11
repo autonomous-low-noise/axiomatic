@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   navDown, navUp, navLeftSec, navRightSec, selToTileIndex,
-  type NavSection, type NavSel, type NavAction,
+  type NavSection, type NavSel,
 } from '../lib/grid-nav'
 
 export type { NavSection }

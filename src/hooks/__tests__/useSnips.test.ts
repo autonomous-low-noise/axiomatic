@@ -130,8 +130,8 @@ describe('useSnips', () => {
 })
 
 describe('useAllSnips', () => {
-  const dir1 = { path: '/lib1', label: 'Library 1' }
-  const dir2 = { path: '/lib2', label: 'Library 2' }
+  const dir1 = { id: 1, path: '/lib1', label: 'Library 1', added_at: '2024-01-01T00:00:00Z' }
+  const dir2 = { id: 2, path: '/lib2', label: 'Library 2', added_at: '2024-01-01T00:00:00Z' }
 
   const snipA: Snip = { ...sampleSnip, id: 'a', slug: 'book_a', tags: ['math'] }
   const snipB: Snip = { ...sampleSnip, id: 'b', slug: 'book_b', tags: [] }
@@ -185,7 +185,7 @@ describe('useAllSnips', () => {
   })
 
   it('returns empty snips when directories is empty', async () => {
-    const empty: typeof dir1[] = []
+    const empty: (typeof dir1)[] = []
     const { result } = renderHook(({ d }) => useAllSnips(d), { initialProps: { d: empty } })
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.snips).toEqual([])
