@@ -107,6 +107,7 @@ Panel toggle commands dispatch `CustomEvent` on `window` (e.g. `axiomatic:toggle
 - No component library — all UI is hand-written
 - PDFs rendered via `pdfium://` custom protocol (native PDFium, JPEG output)
 - **Test-before-modify rule**: Before changing any logic, verify it has test coverage. If not, extract into a testable unit and write tests FIRST. This applies to all logic — component wiring, command lists, state assembly — not just leaf components. Tests must assert desired behavior, not mirror current implementation.
+- **Pre-release gate**: Always run `./scripts/prebuild.sh <version>` before pushing a release tag. Never tag manually. The script runs the full lint → typecheck → test pipeline and only tags if everything passes.
 
 ## Commands
 
@@ -114,7 +115,17 @@ Panel toggle commands dispatch `CustomEvent` on `window` (e.g. `axiomatic:toggle
 npm run dev          # tauri dev (vite + rust)
 npm run build        # tauri build
 npm run vite:dev     # vite only (no tauri)
-npx tsc --noEmit     # type-check
+npx tsc -b           # type-check (same as build uses)
+npm run lint         # eslint
+npm run test         # vitest unit tests
+cargo test --lib     # rust unit tests (from src-tauri/)
+```
+
+## Release workflow
+
+```bash
+./scripts/prebuild.sh <version>   # bump, lint, fix, test, commit, tag
+git push origin master --tags     # push commit + tag → triggers CI release
 ```
 
 ## Known gotchas
