@@ -34,7 +34,7 @@ class MockIntersectionObserver {
 
 const makeDocInfo = (pageCount = 3): DocumentInfo => ({
   page_count: pageCount,
-  pages: Array.from({ length: pageCount }, () => ({ aspect_ratio: 0.75 })),
+  pages: Array.from({ length: pageCount }, () => ({ width_pts: 612, height_pts: 792, aspect_ratio: 0.75 })),
 })
 
 beforeEach(() => {
