@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type React from 'react'
 import { makeResizeHandler } from '../makeResizeHandler'
 
 describe('makeResizeHandler', () => {
@@ -15,7 +16,7 @@ describe('makeResizeHandler', () => {
     const startDrag = makeResizeHandler(setter, 100, 500, 'left')
 
     // Simulate mousedown
-    const mouseDownEvent = { preventDefault: vi.fn() } as any
+    const mouseDownEvent = { preventDefault: vi.fn() } as unknown as React.MouseEvent
     startDrag(mouseDownEvent)
 
     // Fire 10 rapid mousemove events with no animation frame between

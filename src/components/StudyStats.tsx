@@ -39,6 +39,7 @@ export function StudyStats({ dirPaths }: Props) {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: async data fetch with cleanup */
     if (dirPaths.length === 0) {
       setSessions([])
       setLoaded(true)
@@ -65,6 +66,7 @@ export function StudyStats({ dirPaths }: Props) {
 
     fetchAll()
     return () => { cancelled = true }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [dirPaths])
 
   const { todayMinutes, weekMinutes, todayPomodoros, weekPomodoros, weekBooks, buckets } =

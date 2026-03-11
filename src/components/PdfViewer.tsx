@@ -731,18 +731,18 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     [visibleRange, layoutWidth, pageOffsets, encodedPath, dpr, fetchTick, highlightsForPage, handleContextMenu, handleLinkClick, clipStartPage, snipMode, onSnipRegion, warmTick],
   )
 
+  /* eslint-disable react-hooks/immutability -- merging local + forwarded ref via callback */
+  const mergedContainerRef = useCallback((node: HTMLDivElement | null) => {
+    ;(containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+    if (externalContainerRef) {
+      ;(externalContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+    }
+  }, [externalContainerRef])
+  /* eslint-enable react-hooks/immutability */
+
   return (
     <div
-      ref={(node) => {
-        ;(
-          containerRef as React.MutableRefObject<HTMLDivElement | null>
-        ).current = node
-        if (externalContainerRef) {
-          ;(
-            externalContainerRef as React.MutableRefObject<HTMLDivElement | null>
-          ).current = node
-        }
-      }}
+      ref={mergedContainerRef}
       className="pdf-reader flex-1 overflow-y-auto bg-[#eee8d5] dark:bg-[#073642]"
     >
       {numPages > 0 && (

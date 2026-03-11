@@ -38,15 +38,27 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
   const [customBreak, setCustomBreak] = useState(String(config.breakMinutes))
   const popoverRef = useRef<HTMLDivElement>(null)
   const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number }>({ top: 40, right: 8 })
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync derived state with config changes */
     setCustomWork(String(config.workMinutes))
     setCustomBreak(String(config.breakMinutes))
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [config.workMinutes, config.breakMinutes])
 
   useEffect(() => {
     applyNewDuration(config.workMinutes)
   }, [config.workMinutes])
+
+  useEffect(() => {
+    if (!popoverOpen) return
+    const r = settingsBtnRef.current?.getBoundingClientRect()
+    if (r) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: compute position on popover open
+      setPopoverPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+  }, [popoverOpen])
 
   useEffect(() => {
     if (!popoverOpen) return
@@ -135,7 +147,7 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
           </button>
         </div>
         {popoverOpen && createPortal(
-          <div ref={popoverRef} className="fixed z-50 w-64 rounded-lg border border-[#eee8d5] bg-[#fdf6e3] p-3 shadow-lg dark:border-[#073642] dark:bg-[#002b36]" style={(() => { const r = settingsBtnRef.current?.getBoundingClientRect(); return r ? { top: r.bottom + 4, right: window.innerWidth - r.right } : { top: 40, right: 8 } })()}>
+          <div ref={popoverRef} className="fixed z-50 w-64 rounded-lg border border-[#eee8d5] bg-[#fdf6e3] p-3 shadow-lg dark:border-[#073642] dark:bg-[#002b36]" style={popoverPos}>
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#93a1a1] dark:text-[#657b83]">
               Duration
             </div>

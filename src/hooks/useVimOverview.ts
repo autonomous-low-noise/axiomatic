@@ -27,11 +27,14 @@ export function useVimOverview(
   // Refs keep latest values accessible in the handler without
   // re-registering it on every state change.
   const selRef = useRef(sel)
-  selRef.current = sel
   const sectionsRef = useRef(sections)
-  sectionsRef.current = sections
   const slugsRef = useRef(slugs)
-  slugsRef.current = slugs
+
+  useEffect(() => {
+    selRef.current = sel
+    sectionsRef.current = sections
+    slugsRef.current = slugs
+  })
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

@@ -61,6 +61,7 @@ export function useVimReader({
 
   // Reset to pdf when notes close
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset pane when notes close
     if (!notesOpen) setActivePane('pdf')
   }, [notesOpen])
 

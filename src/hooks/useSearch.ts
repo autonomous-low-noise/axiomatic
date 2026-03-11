@@ -13,6 +13,7 @@ export function useSearch(fullPath: string | undefined) {
 
   // Search whenever query changes
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: reset and async fetch with cleanup */
     if (!query.trim() || !fullPath) {
       setMatches([])
       setCurrentIndex(0)
@@ -37,6 +38,7 @@ export function useSearch(fullPath: string | undefined) {
     return () => {
       cancelled = true
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [query, fullPath])
 
   const nextMatch = useCallback(() => {

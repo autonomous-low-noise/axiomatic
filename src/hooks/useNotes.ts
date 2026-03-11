@@ -3,10 +3,8 @@ import { getNote as getNoteSql, setNote as setNoteSql } from '../lib/notes'
 
 type NoteCache = Map<string, string>
 
-let cache: NoteCache = new Map()
+const cache: NoteCache = new Map()
 let listeners: Array<() => void> = []
-let revision = 0
-
 function subscribe(cb: () => void) {
   listeners = [...listeners, cb]
   return () => {
@@ -15,7 +13,6 @@ function subscribe(cb: () => void) {
 }
 
 function emitChange() {
-  revision += 1
   for (const l of listeners) l()
 }
 

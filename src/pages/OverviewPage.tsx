@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { useTextbooks } from '../hooks/useTextbooks'
 import { useDirectories } from '../hooks/useDirectories'
@@ -48,7 +48,6 @@ export function OverviewPage() {
   const [activeTagFilters, setActiveTagFilters] = useState<Set<number>>(new Set())
   const filterInputRef = useRef<HTMLInputElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
-
   const [orphanCandidates, setOrphanCandidates] = useState<OrphanCandidate[]>([])
   const [showMigrationDialog, setShowMigrationDialog] = useState(false)
   const orphanCheckDone = useRef(false)
@@ -231,18 +230,40 @@ export function OverviewPage() {
     )
   }
 
-  // Progressive rendering: track how many items we've emitted across sections
-  let remaining = renderLimit
-  let flatOffset = 0
-  let gridRefAssigned = false
+  // Precompute section layouts via reduce (pure — no mutable let in render)
+  type DirLayout = { sec: typeof dirSections[0]; books: typeof dirSections[0]['books'] | null; flatStart: number; isFirstGrid: boolean; expanded: boolean }
+  type Acc = { rem: number; offset: number; gridAssigned: boolean; starred: { books: typeof starredBooks; flatStart: number; isFirstGrid: boolean } | null; dirs: DirLayout[] }
 
-  const getGridRef = () => {
-    if (!gridRefAssigned) {
-      gridRefAssigned = true
-      return gridRef
+  const initAcc: Acc = { rem: renderLimit, offset: 0, gridAssigned: false, starred: null, dirs: [] }
+
+  // Step 1: starred section
+  const afterStarred: Acc = (starredBooks.length > 0 && isExpanded('starred') && initAcc.rem > 0)
+    ? {
+        ...initAcc,
+        rem: initAcc.rem - Math.min(starredBooks.length, initAcc.rem),
+        offset: initAcc.offset + starredBooks.length,
+        gridAssigned: true,
+        starred: { books: starredBooks.slice(0, initAcc.rem), flatStart: initAcc.offset, isFirstGrid: true },
+      }
+    : initAcc
+
+  // Step 2: dir sections
+  const sectionLayouts = dirSections.reduce<Acc>((acc, sec) => {
+    const dirKey = `dir-${sec.dir.id}`
+    const expanded = isExpanded(dirKey)
+    if (expanded && acc.rem > 0) {
+      const books = sec.books.slice(0, acc.rem)
+      const isFirst = !acc.gridAssigned
+      return {
+        ...acc,
+        rem: acc.rem - books.length,
+        offset: acc.offset + sec.books.length,
+        gridAssigned: true,
+        dirs: [...acc.dirs, { sec, books, flatStart: acc.offset, isFirstGrid: isFirst, expanded }],
+      }
     }
-    return undefined
-  }
+    return { ...acc, dirs: [...acc.dirs, { sec, books: null, flatStart: 0, isFirstGrid: false, expanded }] }
+  }, afterStarred)
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
@@ -304,6 +325,16 @@ export function OverviewPage() {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1 pl-1">
+          <Link
+            to="/snips"
+            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            aria-label="Snips"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </svg>
+          </Link>
           {filterOpen ? (
             <div className="relative flex shrink-0 items-center">
               <input
@@ -381,12 +412,9 @@ export function OverviewPage() {
             <span>Starred</span>
             <span className="text-xs opacity-60">({starredBooks.length})</span>
           </button>
-          {isExpanded('starred') && remaining > 0 && (
-            <>
-              <TileGrid gridRef={getGridRef()}>
-                {starredBooks.slice(0, remaining).map((book, i) => {
-                  const idx = flatOffset + i
-                  return (
+          {sectionLayouts.starred && (
+              <TileGrid gridRef={sectionLayouts.starred.isFirstGrid ? gridRef : undefined}>
+                {sectionLayouts.starred.books.map((book, i) => (
                     <BookTile
                       key={book.slug}
                       slug={book.slug}
@@ -394,52 +422,18 @@ export function OverviewPage() {
                       fullPath={book.full_path}
                       progress={progress[book.slug]}
                       starred={!!starred[book.slug]}
-                      selected={selectedIndex === idx}
+                      selected={selectedIndex === sectionLayouts.starred!.flatStart + i}
                       onToggleStar={toggle}
                       onContextMenu={handleContextMenu}
                       tags={bookTags[book.slug]}
                     />
-                  )
-                })}
+                ))}
               </TileGrid>
-              {(() => {
-                const shown = Math.min(starredBooks.length, remaining)
-                remaining -= shown
-                flatOffset += starredBooks.length
-                return null
-              })()}
-            </>
           )}
         </section>
       )}
-      {dirSections.map((sec) => {
+      {sectionLayouts.dirs.map(({ sec, books: booksToShow, flatStart, isFirstGrid, expanded }) => {
         const dirKey = `dir-${sec.dir.id}`
-        const expanded = isExpanded(dirKey)
-        let sectionContent = null
-        if (expanded && remaining > 0) {
-          const sectionStart = flatOffset
-          const booksToShow = sec.books.slice(0, remaining)
-          remaining -= booksToShow.length
-          flatOffset += sec.books.length
-          sectionContent = (
-            <TileGrid gridRef={getGridRef()}>
-              {booksToShow.map((book, i) => (
-                <BookTile
-                  key={book.slug}
-                  slug={book.slug}
-                  title={book.title}
-                  fullPath={book.full_path}
-                  progress={progress[book.slug]}
-                  starred={!!starred[book.slug]}
-                  selected={selectedIndex === sectionStart + i}
-                  onToggleStar={toggle}
-                  onContextMenu={handleContextMenu}
-                  tags={bookTags[book.slug]}
-                />
-              ))}
-            </TileGrid>
-          )
-        }
         return (
           <section key={sec.dir.id}>
             <button
@@ -454,7 +448,24 @@ export function OverviewPage() {
               <span>{sec.dir.label}</span>
               <span className="text-xs opacity-60">({sec.books.length})</span>
             </button>
-            {sectionContent}
+            {booksToShow && (
+              <TileGrid gridRef={isFirstGrid ? gridRef : undefined}>
+                {booksToShow.map((book, i) => (
+                  <BookTile
+                    key={book.slug}
+                    slug={book.slug}
+                    title={book.title}
+                    fullPath={book.full_path}
+                    progress={progress[book.slug]}
+                    starred={!!starred[book.slug]}
+                    selected={selectedIndex === flatStart + i}
+                    onToggleStar={toggle}
+                    onContextMenu={handleContextMenu}
+                    tags={bookTags[book.slug]}
+                  />
+                ))}
+              </TileGrid>
+            )}
           </section>
         )
       })}

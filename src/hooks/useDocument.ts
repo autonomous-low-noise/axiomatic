@@ -24,6 +24,7 @@ export function useDocument(fullPath: string | undefined) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync cache hit and async fetch with cleanup */
     if (!fullPath) return
 
     const hit = docCache.get(fullPath)
@@ -58,6 +59,7 @@ export function useDocument(fullPath: string | undefined) {
     return () => {
       cancelled = true
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [fullPath])
 
   return { docInfo, loading, error }

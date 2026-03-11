@@ -44,6 +44,7 @@ export function LoopCarousel({
   useEffect(() => {
     if (snips.length > 0 && !snipsInitializedRef.current) {
       snipsInitializedRef.current = true
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: one-time initialization on first data arrival
       setOrderedSnips(shuffled ? shuffle(snips) : [...snips])
     }
   }, [snips, shuffled])

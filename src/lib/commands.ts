@@ -1,7 +1,14 @@
 import type { Command } from '../components/CommandPalette'
 import { setTheme } from '../hooks/useTheme'
 
-export function buildCommands(isReader: boolean, theme: string): Command[] {
+interface BuildCommandsOptions {
+  isReader: boolean
+  isOverview: boolean
+  theme: string
+  navigate: (path: string) => void
+}
+
+export function buildCommands({ isReader, isOverview, theme, navigate }: BuildCommandsOptions): Command[] {
   const cmds: Command[] = [
     {
       id: 'theme-system',
@@ -14,6 +21,14 @@ export function buildCommands(isReader: boolean, theme: string): Command[] {
       action: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
     },
   ]
+
+  if (isOverview) {
+    cmds.push({
+      id: 'show-stats',
+      label: 'Show stats',
+      action: () => navigate('/stats'),
+    })
+  }
 
   if (isReader) {
     cmds.push(

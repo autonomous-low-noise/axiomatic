@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.0.7
+
+### Navigation overhaul
+
+- **Removed root sidebar** — the vertical Projects/Snips/Stats sidebar is gone; navigation is now inline in each page's toolbar.
+- **Snips button in overview toolbar** — open-book icon links to `/snips`, placed before the filter button.
+- **Snips button in reader toolbar** — same open-book icon in the reader, gated behind the learning tools toggle.
+- **Stats via command palette** — "Show stats" command available on the overview page (`Ctrl+P`), navigates to `/stats`.
+- **Titlebar simplified** — Linux layout no longer has a sidebar gap; macOS/Windows titlebar unchanged.
+
+### Pomodoro timer relocation
+
+- **Removed from snips page** — the timer was redundant on the snip table view.
+- **Added to loop page** — PomodoroTimer now renders between the tab bar and carousel on `/loop/:slug`, with `activeSlug` for session logging.
+- **Global timer state preserved** — the module-level timer store is shared across reader and loop pages; navigating between them keeps the timer running.
+
+### Toolbar fixes
+
+- **Reader toolbar right-alignment** — added `ml-auto` to the right section so search/palette buttons stay at the right edge regardless of title width.
+
+### Commands
+
+- **`buildCommands` refactored** — now takes an options object `{ isReader, isOverview, theme, navigate }` instead of positional args.
+
+### Tests
+
+- **New**: `Titlebar` nav link tests (removed with sidebar), `OverviewPage` toolbar nav tests, `LoopPage` PomodoroTimer test, `ReaderToolbar` Snips link and right-alignment tests.
+- **Removed**: `Sidebar.test.tsx` (component deleted).
+- **Updated**: `SnipsPage` timer assertion flipped, `commands.test.ts` adapted to new signature.
+
 ## v0.0.6
 
 ### Command palette

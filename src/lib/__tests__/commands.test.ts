@@ -6,6 +6,7 @@ import { setTheme } from '../../hooks/useTheme'
 import { buildCommands } from '../commands'
 
 const mockedSetTheme = vi.mocked(setTheme)
+const noop = () => {}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -13,7 +14,7 @@ beforeEach(() => {
 
 describe('buildCommands', () => {
   it('returns theme commands on non-reader pages', () => {
-    const cmds = buildCommands(false, 'light')
+    const cmds = buildCommands({ isReader: false, isOverview: false, theme: 'light', navigate: noop })
     const ids = cmds.map((c) => c.id)
     expect(ids).toContain('theme-system')
     expect(ids).toContain('theme-toggle')
@@ -22,7 +23,7 @@ describe('buildCommands', () => {
   })
 
   it('includes reader commands including toggle-learning-tools', () => {
-    const cmds = buildCommands(true, 'dark')
+    const cmds = buildCommands({ isReader: true, isOverview: false, theme: 'dark', navigate: noop })
     const ids = cmds.map((c) => c.id)
     expect(ids).toContain('toggle-outline')
     expect(ids).toContain('toggle-notes')
@@ -33,7 +34,7 @@ describe('buildCommands', () => {
   })
 
   it('does not include per-tool commands (snip, loop, pomodoro)', () => {
-    const cmds = buildCommands(true, 'light')
+    const cmds = buildCommands({ isReader: true, isOverview: false, theme: 'light', navigate: noop })
     const ids = cmds.map((c) => c.id)
     expect(ids).not.toContain('snip')
     expect(ids).not.toContain('stop-snipping')
@@ -42,30 +43,38 @@ describe('buildCommands', () => {
     expect(ids).not.toContain('toggle-pomodoro')
   })
 
-  it('does not include snips-page or stats-page navigation commands', () => {
-    const cmds = buildCommands(false, 'light')
-    const ids = cmds.map((c) => c.id)
-    expect(ids).not.toContain('snips-page')
-    expect(ids).not.toContain('stats-page')
+  it('includes show-stats on overview page', () => {
+    const nav = vi.fn()
+    const cmds = buildCommands({ isReader: false, isOverview: true, theme: 'light', navigate: nav })
+    const cmd = cmds.find((c) => c.id === 'show-stats')
+    expect(cmd).toBeDefined()
+    expect(cmd!.label).toBe('Show stats')
+    cmd!.action()
+    expect(nav).toHaveBeenCalledWith('/stats')
+  })
+
+  it('does not include show-stats on non-overview pages', () => {
+    const cmds = buildCommands({ isReader: true, isOverview: false, theme: 'light', navigate: noop })
+    expect(cmds.map((c) => c.id)).not.toContain('show-stats')
   })
 
   it('shows correct theme toggle label per mode', () => {
-    expect(buildCommands(false, 'dark').find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to light mode')
-    expect(buildCommands(false, 'light').find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to dark mode')
+    expect(buildCommands({ isReader: false, isOverview: false, theme: 'dark', navigate: noop }).find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to light mode')
+    expect(buildCommands({ isReader: false, isOverview: false, theme: 'light', navigate: noop }).find((c) => c.id === 'theme-toggle')?.label).toBe('Switch to dark mode')
   })
 
   it('theme-system action calls setTheme("system")', () => {
-    const cmds = buildCommands(false, 'light')
+    const cmds = buildCommands({ isReader: false, isOverview: false, theme: 'light', navigate: noop })
     cmds.find((c) => c.id === 'theme-system')!.action()
     expect(mockedSetTheme).toHaveBeenCalledWith('system')
   })
 
   it('theme-toggle action toggles theme correctly', () => {
-    buildCommands(false, 'dark').find((c) => c.id === 'theme-toggle')!.action()
+    buildCommands({ isReader: false, isOverview: false, theme: 'dark', navigate: noop }).find((c) => c.id === 'theme-toggle')!.action()
     expect(mockedSetTheme).toHaveBeenCalledWith('light')
 
     mockedSetTheme.mockClear()
-    buildCommands(false, 'light').find((c) => c.id === 'theme-toggle')!.action()
+    buildCommands({ isReader: false, isOverview: false, theme: 'light', navigate: noop }).find((c) => c.id === 'theme-toggle')!.action()
     expect(mockedSetTheme).toHaveBeenCalledWith('dark')
   })
 
@@ -83,7 +92,7 @@ describe('buildCommands', () => {
     ]
     for (const name of eventNames) window.addEventListener(name, listener)
 
-    const cmds = buildCommands(true, 'light')
+    const cmds = buildCommands({ isReader: true, isOverview: false, theme: 'light', navigate: noop })
     const readerIds = ['toggle-outline', 'toggle-notes', 'toggle-bookmarks', 'toggle-highlights', 'toggle-zen', 'toggle-learning-tools']
     for (const id of readerIds) {
       cmds.find((c) => c.id === id)!.action()
@@ -95,7 +104,7 @@ describe('buildCommands', () => {
   })
 
   it('all commands have non-empty labels', () => {
-    const cmds = buildCommands(true, 'dark')
+    const cmds = buildCommands({ isReader: true, isOverview: false, theme: 'dark', navigate: noop })
     for (const cmd of cmds) {
       expect(cmd.label.length).toBeGreaterThan(0)
     }

@@ -24,6 +24,7 @@ export function CommandPalette({ commands, onClose }: Props) {
 
   // Reset selection when filter changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset derived state on query change
     setSelected(0)
   }, [query])
 

@@ -48,7 +48,7 @@ beforeEach(() => {
 
 describe('OutlineSidebar memoization', () => {
   it('is wrapped with React.memo', () => {
-    expect((OutlineSidebar as any).$$typeof).toBe(Symbol.for('react.memo'))
+    expect((OutlineSidebar as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'))
   })
 })
 

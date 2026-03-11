@@ -17,6 +17,7 @@ export function useStarred(textbooks: Textbook[]) {
   const dirPaths = useMemo(() => [...new Set(textbooks.map((b) => b.dir_path))], [textbooks])
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: reset and async fetch with cleanup */
     const key = dirPaths.slice().sort().join('\n')
     if (key === loadedDirsRef.current && key !== '') return
     loadedDirsRef.current = key
@@ -37,6 +38,7 @@ export function useStarred(textbooks: Textbook[]) {
     ).catch((err) => console.error('Failed to load starred:', err))
 
     return () => { cancelled = true }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [dirPaths])
 
   const toggle = useCallback(

@@ -12,7 +12,6 @@ import { LoopCarousel } from '../components/LoopCarousel'
 import { SnipImage } from '../components/SnipImage'
 import { SnipTagManager } from '../components/SnipTagManager'
 import { SnipTagAssigner } from '../components/SnipTagAssigner'
-import { PomodoroTimer } from '../components/PomodoroTimer'
 
 interface ContextMenuState {
   x: number
@@ -90,6 +89,7 @@ export function SnipsPage() {
 
   // Clamp selectedIndex when filtered rows change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clamp index on data change
     setSelectedIndex((prev) => {
       if (filteredSnips.length === 0) return -1
       if (prev >= filteredSnips.length) return filteredSnips.length - 1
@@ -99,6 +99,7 @@ export function SnipsPage() {
 
   // Clear selection when snips change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clamp index on data change
     setSelectedIds((prev) => {
       const validIds = new Set(snips.map((s) => s.id))
       const next = new Set([...prev].filter((id) => validIds.has(id)))
@@ -418,8 +419,6 @@ export function SnipsPage() {
             </button>
           )}
         </div>
-
-        <PomodoroTimer zenMode={false} />
 
         <button
           onClick={togglePalette}

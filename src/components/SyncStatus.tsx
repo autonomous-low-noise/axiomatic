@@ -42,6 +42,7 @@ export function SyncStatus({ phase, label, bookCount }: SyncStatusProps) {
   const unmountTimer = useRef<ReturnType<typeof setTimeout>>(null)
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync visibility with phase transitions */
     if (fadeTimer.current) clearTimeout(fadeTimer.current)
     if (unmountTimer.current) clearTimeout(unmountTimer.current)
 
@@ -59,6 +60,7 @@ export function SyncStatus({ phase, label, bookCount }: SyncStatusProps) {
       if (fadeTimer.current) clearTimeout(fadeTimer.current)
       if (unmountTimer.current) clearTimeout(unmountTimer.current)
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [phase])
 
   if (bookCount === 0 || !visible) return null

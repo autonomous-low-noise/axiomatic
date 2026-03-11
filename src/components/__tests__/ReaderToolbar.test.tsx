@@ -107,6 +107,7 @@ describe('ReaderToolbar', () => {
     expect(screen.queryByLabelText('Loop sorted')).toBeNull()
     expect(screen.queryByLabelText('Loop shuffled')).toBeNull()
     expect(screen.queryByTestId('pomodoro-timer')).toBeNull()
+    expect(screen.queryByLabelText('Snips')).toBeNull()
   })
 
   // learningTools=true (default) shows them
@@ -166,5 +167,31 @@ describe('ReaderToolbar', () => {
     const right = toolbar.children[2] as HTMLElement
     expect(left.className).toContain('shrink-0')
     expect(right.className).toContain('shrink-0')
+  })
+
+  it('renders Snips nav link always visible', () => {
+    renderToolbar()
+    const link = screen.getByLabelText('Snips')
+    expect(link.tagName).toBe('A')
+    expect(link).toHaveAttribute('href', '/snips')
+  })
+
+  it('hides Snips nav link when learningTools is false', () => {
+    renderToolbar({ learningTools: false })
+    expect(screen.queryByLabelText('Snips')).toBeNull()
+  })
+
+  it('Snips nav icon is not the scissors icon', () => {
+    renderToolbar()
+    const snipsLink = screen.getByLabelText('Snips')
+    // Scissors icon has <circle> elements; the nav icon must not
+    expect(snipsLink.querySelector('circle')).toBeNull()
+  })
+
+  it('right section is pushed to the right edge via ml-auto', () => {
+    const { container } = renderToolbar()
+    const toolbar = container.querySelector('[class*="h-10"]')!
+    const right = toolbar.children[2] as HTMLElement
+    expect(right.className).toContain('ml-auto')
   })
 })

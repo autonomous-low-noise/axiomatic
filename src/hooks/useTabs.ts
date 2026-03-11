@@ -139,7 +139,7 @@ export function useTabNavigation(currentSlug: string | undefined) {
     tabState.setActiveTab(slug)
     const tab = tabsRef.current.find((t) => t.slug === slug)
     navigate(tab?.route || `/read/${slug}`)
-  }, [navigate, tabState.setActiveTab])
+  }, [navigate, tabState])
 
   const closeTabAndNavigate = useCallback((slug: string) => {
     const nextSlug = tabState.closeTab(slug)
@@ -149,7 +149,7 @@ export function useTabNavigation(currentSlug: string | undefined) {
     } else if (!nextSlug) {
       navigate('/')
     }
-  }, [tabState.closeTab, navigate, currentSlug])
+  }, [tabState, navigate, currentSlug])
 
   const closeOtherTabsAndNavigate = useCallback((keepSlug: string) => {
     tabState.closeOtherTabs(keepSlug)
@@ -157,7 +157,7 @@ export function useTabNavigation(currentSlug: string | undefined) {
       const tab = tabsRef.current.find((t) => t.slug === keepSlug)
       navigate(tab?.route || `/read/${keepSlug}`)
     }
-  }, [tabState.closeOtherTabs, navigate, currentSlug])
+  }, [tabState, navigate, currentSlug])
 
   return { ...tabState, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate }
 }

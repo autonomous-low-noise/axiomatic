@@ -24,6 +24,7 @@ export function useSnipTagDefs(dirPaths: string[]) {
   }, [dirPaths])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: fetch on mount
     refresh()
   }, [refresh])
 

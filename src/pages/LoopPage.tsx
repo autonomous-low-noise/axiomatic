@@ -5,6 +5,7 @@ import { useSnips } from '../hooks/useSnips'
 import { useTabNavigation } from '../hooks/useTabs'
 import { LoopCarousel } from '../components/LoopCarousel'
 import { TabBar } from '../components/TabBar'
+import { PomodoroTimer } from '../components/PomodoroTimer'
 
 export function LoopPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -76,6 +77,9 @@ export function LoopPage() {
         onClose={closeTabAndNavigate}
         onCloseOthers={closeOtherTabsAndNavigate}
       />
+      <div className="flex shrink-0 items-center justify-end border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+        <PomodoroTimer zenMode={false} activeSlug={slug} activeDirPath={book?.dir_path} />
+      </div>
       <LoopCarousel
         snips={snips}
         xp={xp}

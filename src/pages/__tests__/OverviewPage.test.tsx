@@ -112,6 +112,38 @@ beforeEach(() => {
   resetCollapseState()
 })
 
+describe('OverviewPage toolbar nav icons', () => {
+  it('renders Snips link in the toolbar', () => {
+    renderPage()
+    const snipsLink = screen.getByLabelText('Snips')
+    expect(snipsLink).toBeInTheDocument()
+    expect(snipsLink.tagName).toBe('A')
+    expect(snipsLink).toHaveAttribute('href', '/snips')
+  })
+
+  it('does not render a Stats link in the toolbar', () => {
+    renderPage()
+    expect(screen.queryByLabelText('Stats')).toBeNull()
+  })
+
+  it('Snips nav icon is not the scissors icon', () => {
+    renderPage()
+    const snipsLink = screen.getByLabelText('Snips')
+    expect(snipsLink.querySelector('circle')).toBeNull()
+  })
+
+  it('Snips icon appears before the filter button', () => {
+    renderPage()
+    const snipsLink = screen.getByLabelText('Snips')
+    const filterBtn = screen.getByLabelText('Filter books')
+    const toolbar = snipsLink.closest('div')!
+    const children = Array.from(toolbar.children)
+    const snipsIdx = children.indexOf(snipsLink)
+    const filterIdx = children.indexOf(filterBtn)
+    expect(snipsIdx).toBeLessThan(filterIdx)
+  })
+})
+
 describe('OverviewPage collapsible sections', () => {
   it('sections are collapsed by default', () => {
     renderPage()

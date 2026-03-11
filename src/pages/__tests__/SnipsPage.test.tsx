@@ -62,7 +62,7 @@ vi.mock('../../components/PomodoroTimer', () => ({
 
 // LoopCarousel is complex and unnecessary for these tests
 vi.mock('../../components/LoopCarousel', () => ({
-  LoopCarousel: (props: any) => <div data-testid="loop-carousel" data-shuffled={String(props.shuffled)} data-view-mode={props.viewMode ? 'true' : undefined} />,
+  LoopCarousel: (props: { shuffled: boolean; viewMode?: boolean }) => <div data-testid="loop-carousel" data-shuffled={String(props.shuffled)} data-view-mode={props.viewMode ? 'true' : undefined} />,
 }))
 
 import { SnipsPage } from '../SnipsPage'
@@ -271,9 +271,9 @@ describe('SnipsPage', () => {
     )).toBeInTheDocument()
   })
 
-  it('renders PomodoroTimer in toolbar', () => {
+  it('does not render PomodoroTimer in toolbar', () => {
     renderPage()
-    expect(screen.getByTestId('pomodoro-timer')).toBeInTheDocument()
+    expect(screen.queryByTestId('pomodoro-timer')).toBeNull()
   })
 
   it('context menu shows View option', () => {

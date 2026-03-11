@@ -123,7 +123,7 @@ export function ReaderToolbar({
           {title}
         </span>
         {/* Right: search, actions */}
-        <div className="flex shrink-0 items-center justify-end gap-1 overflow-hidden">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-1 overflow-hidden">
           {savedProgressPage != null && (
             <button
               onClick={onBackToProgress}
@@ -236,6 +236,18 @@ export function ReaderToolbar({
             </>
           )}
           {learningTools && <PomodoroTimer zenMode={zenMode ?? false} activeSlug={activeSlug} activeDirPath={activeDirPath} />}
+          {learningTools && (
+            <Link
+              to="/snips"
+              className={iconBtnClass}
+              aria-label="Snips"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </Link>
+          )}
           <button
             onClick={onToggleSearch}
             className={searchOpen ? iconBtnActiveClass : iconBtnClass}
