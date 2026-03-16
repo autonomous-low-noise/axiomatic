@@ -12,7 +12,7 @@
 - **LoopCarousel zoom** — zoom controls in the carousel navigation bar; zoom resets on snip change. Card expands to `max-w-[90vw]` when revealed to fit natural snip size.
 - **SnipsPage expanded row zoom** — inline preview now uses `ZoomableSnipImage` instead of a bare fixed-size `SnipImage`.
 - **Original-size reveal** — revealed snips render at their native canvas pixel dimensions, capped at 80vh with overflow scroll.
-- **ResizeObserver fix** — observer stays alive across canvas resizes, fixing a race condition where navigating to a new snip showed a cut-off image on first reveal.
+- **`onSize` callback** — `SnipImage` reports natural canvas dimensions directly after image load. `ZoomableSnipImage` uses this instead of `ResizeObserver`, eliminating the race condition where navigating to a new snip showed a cut-off image on first reveal.
 
 ### Toggleable select mode (snip table)
 
@@ -31,15 +31,21 @@
 
 - **Space as global expand toggler** — Space now toggles reveal/hide in both loop and view modes (previously only revealed, and was a no-op in view mode).
 
+### Snip table improvements
+
+- **Persistent filters** — search, directory filter, and tag filter survive navigation away and back (module-level cache).
+- **Ascending page sort** — snips sorted by page number ascending (was descending by creation date). Sorted carousel mode inherits this order.
+- **Back button in overlays** — loop and view carousel overlays now have a visible back arrow button in the toolbar.
+
 ### Overview toolbar layout
 
 - **Snips button moved** — now between the directory explorer and tag manager buttons (left side of toolbar), instead of the right side next to filter.
 
 ### Tests
 
-- **New**: `ZoomableSnipImage` ResizeObserver race condition tests, `LoopCarousel` zoom controls + keyboard/wheel shortcuts + Space toggle tests, `SnipsPage` select mode + bulk tag + searchable dropdown tests.
+- **New**: `ZoomableSnipImage` onSize callback tests, `LoopCarousel` zoom controls + keyboard/wheel shortcuts + Space toggle tests, `SnipsPage` select mode + bulk tag + searchable dropdown + page sort + back button tests.
 - **Updated**: `OverviewPage` snips button position test reflects new toolbar order.
-- **332 Vitest tests**, 44 Rust tests — all passing.
+- **334 Vitest tests**, 44 Rust tests — all passing.
 
 ## v0.0.7
 

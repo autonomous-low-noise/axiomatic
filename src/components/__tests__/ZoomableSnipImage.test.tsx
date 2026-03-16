@@ -1,45 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { ZoomableSnipImage } from '../ZoomableSnipImage'
 import type { Snip } from '../../hooks/useSnips'
 
-// Track all observer instances so tests can simulate resize events
-type ResizeCallback = (entries: { contentRect: { width: number; height: number } }[]) => void
-const observers: { el: Element; cb: ResizeCallback; disconnected: boolean }[] = []
-
-class TestableResizeObserver {
-  private cb: ResizeCallback
-  constructor(cb: ResizeCallback) {
-    this.cb = cb
-  }
-
-  observe(el: Element) {
-    observers.push({ el, cb: this.cb, disconnected: false })
-    // Fire immediately with the element's current size (simulates real behavior)
-    const rect = el.getBoundingClientRect()
-    if (rect.width > 0 && rect.height > 0) {
-      this.cb([{ contentRect: { width: rect.width, height: rect.height } }])
+// Mock SnipImage to expose onSize callback and simulate canvas dimensions
+vi.mock('../SnipImage', () => ({
+  SnipImage: ({ snip, onSize }: { snip: Snip; className?: string; onSize?: (w: number, h: number) => void }) => {
+    // Simulate async image load: call onSize after a microtask
+    if (onSize) {
+      // Use the snip id to vary sizes for testing
+      const w = snip.id === 'snip-large' ? 800 : 300
+      const h = snip.id === 'snip-large' ? 600 : 200
+      Promise.resolve().then(() => onSize(w, h))
     }
-  }
+    return <canvas data-testid="snip-canvas" />
+  },
+}))
 
-  unobserve() {}
-
-  disconnect() {
-    for (const o of observers) {
-      if (o.cb === this.cb) o.disconnected = true
-    }
-  }
-}
-
-globalThis.ResizeObserver = TestableResizeObserver as unknown as typeof ResizeObserver
-
-function fireResize(el: Element, width: number, height: number) {
-  for (const o of observers) {
-    if (o.el === el && !o.disconnected) {
-      o.cb([{ contentRect: { width, height } }])
-    }
-  }
-}
+import { ZoomableSnipImage } from '../ZoomableSnipImage'
 
 function makeSnip(overrides: Partial<Snip> = {}): Snip {
   return {
@@ -58,50 +35,30 @@ function makeSnip(overrides: Partial<Snip> = {}): Snip {
   }
 }
 
-beforeEach(() => {
-  observers.length = 0
-})
-
 describe('ZoomableSnipImage', () => {
-  it('updates contentSize when canvas resizes after initial measurement', () => {
+  it('sizes container from SnipImage onSize callback', async () => {
     const snip = makeSnip()
     render(<ZoomableSnipImage snip={snip} />)
 
-    const zoomContainer = screen.getByTestId('snip-zoom-container')
-    const scrollWrapper = zoomContainer.parentElement!
+    // Wait for the microtask (simulated image load) to fire onSize
+    await act(() => Promise.resolve())
 
-    // Simulate: observer initially fired with small size (stale canvas from previous snip)
-    // Then canvas loads new image and resizes to larger dimensions
-    act(() => {
-      fireResize(zoomContainer, 800, 600)
-    })
-
-    // The container should reflect the NEW size, not stay at the old one
-    expect(scrollWrapper.style.width).toBe('800px')
-    expect(scrollWrapper.style.height).toBe('600px')
-  })
-
-  it('picks up late canvas resize after observer initially fired with stale size', () => {
-    const snip = makeSnip()
-    render(<ZoomableSnipImage snip={snip} />)
-
-    const zoomContainer = screen.getByTestId('snip-zoom-container')
-    const scrollWrapper = zoomContainer.parentElement!
-
-    // Step 1: observer fires with stale small size (old canvas)
-    act(() => {
-      fireResize(zoomContainer, 300, 200)
-    })
-
+    const scrollWrapper = screen.getByTestId('snip-zoom-container').parentElement!
     expect(scrollWrapper.style.width).toBe('300px')
     expect(scrollWrapper.style.height).toBe('200px')
+  })
 
-    // Step 2: canvas loads new image, resizes to actual dimensions
-    act(() => {
-      fireResize(zoomContainer, 800, 600)
-    })
+  it('updates container when snip changes to a larger image', async () => {
+    const { rerender } = render(<ZoomableSnipImage snip={makeSnip()} />)
 
-    // Container MUST update to the new size
+    await act(() => Promise.resolve())
+    const scrollWrapper = screen.getByTestId('snip-zoom-container').parentElement!
+    expect(scrollWrapper.style.width).toBe('300px')
+
+    // Switch to a larger snip
+    rerender(<ZoomableSnipImage snip={makeSnip({ id: 'snip-large' })} />)
+    await act(() => Promise.resolve())
+
     expect(scrollWrapper.style.width).toBe('800px')
     expect(scrollWrapper.style.height).toBe('600px')
   })

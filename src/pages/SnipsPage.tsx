@@ -20,6 +20,9 @@ interface ContextMenuState {
   snip: SnipWithDir
 }
 
+// Module-level cache: survives component unmount/remount within the same session
+const _filterCache = { search: '', dirFilter: 'all', selectedTags: [] as string[] }
+
 export function SnipsPage() {
   const navigate = useNavigate()
   const { directories } = useDirectories()
@@ -39,9 +42,16 @@ export function SnipsPage() {
     return map
   }, [tagDefs])
 
-  const [search, setSearch] = useState('')
-  const [dirFilter, setDirFilter] = useState<string>('all')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [search, _setSearch] = useState(_filterCache.search)
+  const setSearch = useCallback((v: string | ((prev: string) => string)) => {
+    _setSearch((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.search = next; return next })
+  }, [])
+  const [dirFilter, _setDirFilter] = useState<string>(_filterCache.dirFilter)
+  const setDirFilter = useCallback((v: string) => { _filterCache.dirFilter = v; _setDirFilter(v) }, [])
+  const [selectedTags, _setSelectedTags] = useState<string[]>(_filterCache.selectedTags)
+  const setSelectedTags = useCallback((v: string[] | ((prev: string[]) => string[])) => {
+    _setSelectedTags((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.selectedTags = next; return next })
+  }, [])
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
   const [loopOpen, setLoopOpen] = useState(false)
@@ -87,7 +97,7 @@ export function SnipsPage() {
       const q = search.trim().toLowerCase()
       result = result.filter((s) => s.label.toLowerCase().includes(q))
     }
-    return [...result].sort((a, b) => b.created_at.localeCompare(a.created_at))
+    return [...result].sort((a, b) => a.page - b.page || a.created_at.localeCompare(b.created_at))
   }, [snips, dirFilter, selectedTags, search])
 
   // Clamp selectedIndex when filtered rows change
@@ -722,7 +732,18 @@ export function SnipsPage() {
       {/* Loop overlay */}
       {loopOpen && (
         <div className="absolute inset-0 z-40 flex flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-          <div className="flex shrink-0 items-center justify-end border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+          <div className="flex shrink-0 items-center gap-2 border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+            <button
+              onClick={() => setLoopOpen(false)}
+              className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              aria-label="Back to snips"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div className="flex-1" />
             <PomodoroTimer zenMode={false} />
           </div>
           <LoopCarousel
@@ -739,7 +760,18 @@ export function SnipsPage() {
       {/* View carousel overlay */}
       {viewStartIndex !== null && (
         <div className="absolute inset-0 z-40 flex flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-          <div className="flex shrink-0 items-center justify-end border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+          <div className="flex shrink-0 items-center gap-2 border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+            <button
+              onClick={() => setViewStartIndex(null)}
+              className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              aria-label="Back to snips"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div className="flex-1" />
             <PomodoroTimer zenMode={false} />
           </div>
           <LoopCarousel

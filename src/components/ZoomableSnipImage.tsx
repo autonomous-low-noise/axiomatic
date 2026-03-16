@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Snip } from '../hooks/useSnips'
 import { SnipImage } from './SnipImage'
 
@@ -16,34 +16,20 @@ interface Props {
 
 export function ZoomableSnipImage({ snip, maxHeight = '60vh', globalShortcuts = false }: Props) {
   const [zoom, setZoom] = useState(1)
-  const contentRef = useRef<HTMLDivElement>(null)
   const [contentSize, setContentSize] = useState<{ w: number; h: number } | null>(null)
 
   // Reset zoom on snip change
   useEffect(() => {
     setZoom(1)
+    setContentSize(null)
   }, [snip.id])
 
-  // Measure content size — keep observer alive so it picks up late canvas resizes
-  // (e.g. when pdfium:// image loads after the initial observer fire)
-  useLayoutEffect(() => {
-    if (!contentRef.current) return
-    const el = contentRef.current
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect
-        if (width > 0 && height > 0) {
-          setContentSize((prev) =>
-            prev && prev.w === width && prev.h === height
-              ? prev
-              : { w: width, h: height },
-          )
-        }
-      }
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [snip.id])
+  // Called by SnipImage after canvas dimensions are set from the loaded image
+  const handleSize = useCallback((w: number, h: number) => {
+    setContentSize((prev) =>
+      prev && prev.w === w && prev.h === h ? prev : { w, h },
+    )
+  }, [])
 
   const handleZoomIn = useCallback(() => {
     setZoom((z) => Math.min(z + ZOOM_STEP, ZOOM_MAX))
@@ -102,11 +88,10 @@ export function ZoomableSnipImage({ snip, maxHeight = '60vh', globalShortcuts = 
         } : undefined}
       >
         <div
-          ref={contentRef}
           data-testid="snip-zoom-container"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
         >
-          <SnipImage snip={snip} className="rounded border border-[#eee8d5] dark:border-[#073642]" />
+          <SnipImage snip={snip} className="rounded border border-[#eee8d5] dark:border-[#073642]" onSize={handleSize} />
         </div>
       </div>
       <div className="flex items-center gap-1">

@@ -383,6 +383,15 @@ describe('SnipsPage', () => {
     expect(carousel).toHaveAttribute('data-view-mode', 'true')
   })
 
+  it('loop overlay has a back button that closes it', () => {
+    renderPage()
+    fireEvent.click(screen.getByText('Loop sorted'))
+    expect(screen.getByTestId('loop-carousel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Back to snips'))
+    expect(screen.queryByTestId('loop-carousel')).not.toBeInTheDocument()
+  })
+
   it('Loop sorted button opens carousel with shuffled=false', () => {
     renderPage()
     fireEvent.click(screen.getByText('Loop sorted'))
@@ -395,6 +404,20 @@ describe('SnipsPage', () => {
     fireEvent.click(screen.getByText('Loop shuffled'))
     const carousel = screen.getByTestId('loop-carousel')
     expect(carousel).toHaveAttribute('data-shuffled', 'true')
+  })
+
+  it('snips are sorted ascending by page number', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Page 10 snip', page: 10, created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Page 2 snip', page: 2, created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'Page 5 snip', page: 5, created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const rows = screen.getAllByRole('row').slice(1) // skip header
+    expect(rows[0]).toHaveTextContent('Page 2 snip')
+    expect(rows[1]).toHaveTextContent('Page 5 snip')
+    expect(rows[2]).toHaveTextContent('Page 10 snip')
   })
 
   it('row click does not toggle selection while renaming', () => {

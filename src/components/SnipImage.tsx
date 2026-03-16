@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Snip } from '../hooks/useSnips'
 
-export function SnipImage({ snip, className }: { snip: Snip; className?: string }) {
+export function SnipImage({ snip, className, onSize }: { snip: Snip; className?: string; onSize?: (w: number, h: number) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -19,6 +19,7 @@ export function SnipImage({ snip, className }: { snip: Snip; className?: string 
       canvas.height = sh
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
+      onSize?.(sw, sh)
     }
     img.src = url
   }, [snip])
