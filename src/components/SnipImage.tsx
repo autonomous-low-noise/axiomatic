@@ -22,6 +22,7 @@ export function SnipImage({ snip, className, onSize }: { snip: Snip; className?:
       onSize?.(sw, sh)
     }
     img.src = url
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onSize is a stable callback from the parent; including it would re-fetch the image on every render
   }, [snip])
 
   return (

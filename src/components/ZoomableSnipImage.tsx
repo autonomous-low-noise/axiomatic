@@ -20,7 +20,9 @@ export function ZoomableSnipImage({ snip, maxHeight = '60vh', globalShortcuts = 
 
   // Reset zoom on snip change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset derived state when snip changes
     setZoom(1)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clear stale size from previous snip
     setContentSize(null)
   }, [snip.id])
 
