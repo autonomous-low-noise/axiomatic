@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.0.10
+
+### Carousel shuffle toggle & re-shuffle
+
+- **Shuffle toggle in carousel** — shuffle icon button in the carousel header toggles between sorted and shuffled order on the fly. Replaces the separate "Loop sorted" / "Loop shuffled" toolbar buttons.
+- **Re-shuffle on loop completion** — when in shuffle mode, completing a full pass through all snips triggers a fresh Fisher-Yates shuffle for the next pass.
+- **Single "Loop" button** — SnipsPage toolbar now has one "Loop" button; sort/shuffle choice is made inside the carousel.
+
+### No XP counter in snip table carousel
+
+- **`noXp` prop** — new `LoopCarousel` prop hides the XP counter display. XP is still tracked and aggregated per-directory/slug in the background.
+- **Snip table carousel** — loop overlay opened from the snip table passes `noXp={true}`.
+
+### Context menu improvements
+
+- **Viewport clamping** — context menu uses `useLayoutEffect` to measure its rendered size and reposition within viewport bounds. Replaces hardcoded pixel margins.
+- **Scrollable** — `max-h-[80vh] overflow-y-auto` prevents cutoff with many tags.
+- **Inline "New tag" input** — create and assign a tag directly from the context menu without opening the tag manager.
+- **AND tag filter** — selecting multiple tags filters snips that have ALL selected tags (was OR).
+
+### Vite 8 upgrade
+
+- **Vite 8.0.0** — upgraded from Vite 7. Also bumped vitest 3→4, @vitejs/plugin-react-swc 4.3, @tailwindcss/vite 4.2, @vitest/coverage-v8 4.1.
+- **Dev port 5174** — changed from 5173 to avoid conflicts with other Vite apps.
+
+### Tests
+
+- **New**: LoopCarousel noXp tests (2), shuffle toggle tests (2), re-shuffle on loop completion test, SnipsPage single Loop button + noXp test.
+- **Updated**: SnipsPage loop button tests adapted from two-button to single-button pattern.
+- **368 Vitest tests**, 44 Rust tests — all passing.
+
 ## v0.0.9
 
 ### Carousel notes panel
