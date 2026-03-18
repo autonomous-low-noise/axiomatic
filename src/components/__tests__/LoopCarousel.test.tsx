@@ -660,6 +660,127 @@ describe('LoopCarousel', () => {
     expect(onExit).toHaveBeenCalledTimes(1)
   })
 
+  it('noXp hides XP counter', async () => {
+    const snips = [makeSnip()]
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={42}
+        onIncrementXp={vi.fn().mockResolvedValue(43)}
+        onExit={vi.fn()}
+        shuffled={false}
+        noXp={true}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('Definition 1.1')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/XP/)).not.toBeInTheDocument()
+  })
+
+  it('noXp still tracks XP on advance', async () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Card A' }),
+      makeSnip({ id: 's2', label: 'Card B' }),
+    ]
+    const onIncrementXp = vi.fn().mockResolvedValue(1)
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={onIncrementXp}
+        onExit={vi.fn()}
+        shuffled={false}
+        noXp={true}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('Card A')).toBeInTheDocument()
+    })
+    fireEvent.keyDown(window, { key: 'j' })
+    await waitFor(() => {
+      expect(screen.getByText('Card B')).toBeInTheDocument()
+    })
+    expect(onIncrementXp).toHaveBeenCalledTimes(1)
+  })
+
+  it('shuffle toggle button visible in normal mode', async () => {
+    const snips = [makeSnip()]
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={vi.fn().mockResolvedValue(0)}
+        onExit={vi.fn()}
+        shuffled={false}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('Definition 1.1')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('Toggle shuffle')).toBeInTheDocument()
+  })
+
+  it('shuffle toggle button not visible in viewMode', async () => {
+    const snips = [makeSnip()]
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={vi.fn().mockResolvedValue(0)}
+        onExit={vi.fn()}
+        shuffled={false}
+        viewMode={true}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByText('Definition 1.1')).toBeInTheDocument()
+    })
+    expect(screen.queryByLabelText('Toggle shuffle')).not.toBeInTheDocument()
+  })
+
+  it('re-shuffles after completing a full loop in shuffle mode', async () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Card A' }),
+      makeSnip({ id: 's2', label: 'Card B' }),
+    ]
+    // Initial shuffle: Math.random()=0.9 → j=floor(0.9*2)=1 → swap[1][1] → no change → [A,B]
+    // Re-shuffle:      Math.random()=0.0 → j=floor(0.0*2)=0 → swap[1][0] → [B,A]
+    let callCount = 0
+    const mockRandom = vi.spyOn(Math, 'random').mockImplementation(() => callCount++ === 0 ? 0.9 : 0)
+
+    render(
+      <LoopCarousel
+        snips={snips}
+        xp={0}
+        onIncrementXp={vi.fn().mockResolvedValue(0)}
+        onExit={vi.fn()}
+        shuffled={true}
+      />,
+    )
+
+    // Initial order [A, B] — first card is A
+    await waitFor(() => {
+      expect(screen.getByText('Card A')).toBeInTheDocument()
+    })
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+
+    // Advance to B (index 1)
+    fireEvent.keyDown(window, { key: 'j' })
+    await waitFor(() => {
+      expect(screen.getByText('Card B')).toBeInTheDocument()
+    })
+
+    // Advance from last card → triggers re-shuffle → [B, A], index=0 → shows B at "1 / 2"
+    fireEvent.keyDown(window, { key: 'j' })
+    await waitFor(() => {
+      expect(screen.getByText('Card B')).toBeInTheDocument()
+    })
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+
+    mockRandom.mockRestore()
+  })
+
   it('j/k still navigate when notes open but editor not focused', async () => {
     const snips = [
       makeSnip({ id: 's1', label: 'Card 1' }),

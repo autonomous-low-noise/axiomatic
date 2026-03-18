@@ -46,11 +46,12 @@ vi.mock('../../hooks/useSnips', async () => {
 })
 
 const stubTagDefs = { defs: [] as { name: string; color: string }[] }
+const mockCreateDef = vi.fn()
 
 vi.mock('../../hooks/useSnipTagDefs', () => ({
   useSnipTagDefs: () => ({
     defs: stubTagDefs.defs,
-    createDef: vi.fn(),
+    createDef: mockCreateDef,
     deleteDef: vi.fn(),
     renameDef: vi.fn(),
     recolorDef: vi.fn(),
@@ -91,13 +92,13 @@ vi.mock('../../components/SnipTagManager', () => ({
 
 // LoopCarousel is complex and unnecessary for these tests
 vi.mock('../../components/LoopCarousel', () => ({
-  LoopCarousel: (props: { shuffled: boolean; viewMode?: boolean }) => <div data-testid="loop-carousel" data-shuffled={String(props.shuffled)} data-view-mode={props.viewMode ? 'true' : undefined} />,
+  LoopCarousel: (props: { shuffled: boolean; viewMode?: boolean; noXp?: boolean }) => <div data-testid="loop-carousel" data-shuffled={String(props.shuffled)} data-view-mode={props.viewMode ? 'true' : undefined} data-no-xp={props.noXp ? 'true' : undefined} />,
 }))
 
 // jsdom lacks scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
 
-import { SnipsPage } from '../SnipsPage'
+import { SnipsPage, _resetFilterCache } from '../SnipsPage'
 
 function makeSnip(overrides: Partial<SnipWithDir> = {}): SnipWithDir {
   return {
@@ -129,8 +130,11 @@ function renderPage(snips: SnipWithDir[] = [makeSnip()]) {
 
 beforeEach(() => {
   mockNavigate.mockClear()
+  mockCreateDef.mockClear()
+  stubAllSnips.addTag.mockClear()
   stubAllSnips.snips = []
   stubTagDefs.defs = []
+  _resetFilterCache()
 })
 
 describe('SnipsPage', () => {
@@ -373,7 +377,7 @@ describe('SnipsPage', () => {
 
   it('renders PomodoroTimer in loop overlay', () => {
     renderPage()
-    fireEvent.click(screen.getByText('Loop sorted'))
+    fireEvent.click(screen.getByText('Loop'))
     expect(screen.getByTestId('pomodoro-timer')).toBeInTheDocument()
   })
 
@@ -405,25 +409,19 @@ describe('SnipsPage', () => {
 
   it('loop overlay has a back button that closes it', () => {
     renderPage()
-    fireEvent.click(screen.getByText('Loop sorted'))
+    fireEvent.click(screen.getByText('Loop'))
     expect(screen.getByTestId('loop-carousel')).toBeInTheDocument()
 
     fireEvent.click(screen.getByLabelText('Back to snips'))
     expect(screen.queryByTestId('loop-carousel')).not.toBeInTheDocument()
   })
 
-  it('Loop sorted button opens carousel with shuffled=false', () => {
+  it('Loop button opens loop overlay with noXp', () => {
     renderPage()
-    fireEvent.click(screen.getByText('Loop sorted'))
+    fireEvent.click(screen.getByText('Loop'))
     const carousel = screen.getByTestId('loop-carousel')
-    expect(carousel).toHaveAttribute('data-shuffled', 'false')
-  })
-
-  it('Loop shuffled button opens carousel with shuffled=true', () => {
-    renderPage()
-    fireEvent.click(screen.getByText('Loop shuffled'))
-    const carousel = screen.getByTestId('loop-carousel')
-    expect(carousel).toHaveAttribute('data-shuffled', 'true')
+    expect(carousel).toBeInTheDocument()
+    expect(carousel).toHaveAttribute('data-no-xp', 'true')
   })
 
   it('Ctrl+H navigates to library', () => {
@@ -551,6 +549,60 @@ describe('SnipsPage', () => {
     expect(rows[0]).toHaveTextContent('A page 1')
     expect(rows[1]).toHaveTextContent('A page 3')
     expect(rows[2]).toHaveTextContent('B page 5')
+  })
+
+  it('context menu is scrollable with max-height', () => {
+    stubTagDefs.defs = Array.from({ length: 20 }, (_, i) => ({ name: `tag-${i}`, color: '#268bd2' }))
+    renderPage()
+    const row = screen.getByText('Definition 1.1').closest('tr')!
+    fireEvent.contextMenu(row)
+    // The context menu portal should have max-height and overflow-y-auto
+    const menu = screen.getByText('View').closest('[class*="fixed"]')!
+    expect(menu.className).toContain('max-h-')
+    expect(menu.className).toContain('overflow-y-auto')
+  })
+
+  it('context menu has inline "New tag" input', () => {
+    renderPage()
+    const row = screen.getByText('Definition 1.1').closest('tr')!
+    fireEvent.contextMenu(row)
+    expect(screen.getByPlaceholderText('New tag…')).toBeInTheDocument()
+  })
+
+  it('context menu "New tag" creates def and assigns tag', async () => {
+    mockCreateDef.mockResolvedValue(undefined)
+    stubAllSnips.addTag.mockResolvedValue(undefined)
+    renderPage()
+    const row = screen.getByText('Definition 1.1').closest('tr')!
+    fireEvent.contextMenu(row)
+    const input = screen.getByPlaceholderText('New tag…')
+    fireEvent.change(input, { target: { value: 'fresh' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(mockCreateDef).toHaveBeenCalledWith('fresh', expect.any(String))
+    // addTag is called after the awaited createDef
+    await vi.waitFor(() => {
+      expect(stubAllSnips.addTag).toHaveBeenCalledWith('/lib', 'snip-1', 'fresh')
+    })
+  })
+
+  it('tag filter is AND: snips must have all selected tags', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Both', tags: ['algebra', 'topology'], created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Only A', tags: ['algebra'], created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'Only T', tags: ['topology'], created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Open tag dropdown and select both tags
+    fireEvent.click(screen.getByText('All tags'))
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    fireEvent.click(within(dropdown as HTMLElement).getByText('algebra'))
+    fireEvent.click(within(dropdown as HTMLElement).getByText('topology'))
+
+    // Only the snip with BOTH tags should remain
+    expect(screen.getByText('Both')).toBeInTheDocument()
+    expect(screen.queryByText('Only A')).not.toBeInTheDocument()
+    expect(screen.queryByText('Only T')).not.toBeInTheDocument()
   })
 
   it('row click does not toggle selection while renaming', () => {

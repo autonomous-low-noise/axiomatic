@@ -17,6 +17,8 @@ interface LoopCarouselProps {
   onIncrementXpForSnip?: (dirPath: string, slug: string) => Promise<void>
   /** When true: images always revealed, no XP tracking */
   viewMode?: boolean
+  /** When true: no XP counter displayed, no XP increment on advance */
+  noXp?: boolean
   /** Start at this index instead of 0 */
   initialIndex?: number
 }
@@ -38,11 +40,14 @@ export function LoopCarousel({
   shuffled,
   onIncrementXpForSnip,
   viewMode,
+  noXp,
   initialIndex,
 }: LoopCarouselProps) {
   const [notesOpen, setNotesOpen] = useState(false)
   const editorRef = useRef<EditorView | null>(null)
   const { ensureNote, setNote } = useNotes()
+
+  const [isShuffled, setIsShuffled] = useState(shuffled)
 
   // Stabilize order: only compute once when snips first arrive (avoids
   // re-shuffling mid-session if the snips array reference changes).
@@ -87,15 +92,29 @@ export function LoopCarousel({
 
   const handleNext = useCallback(() => {
     const currentSnip = orderedSnips[index]
-    setIndex((i) => (i + 1) % orderedSnips.length)
+    if (isShuffled && index === orderedSnips.length - 1) {
+      // Completed a full loop in shuffle mode: re-shuffle for the next pass
+      setOrderedSnips(shuffle(snips))
+      setIndex(0)
+    } else {
+      setIndex((i) => (i + 1) % orderedSnips.length)
+    }
     if (!viewMode) setRevealed(false)
     if (currentSnip) advance(currentSnip)
-  }, [orderedSnips, index, advance, viewMode])
+  }, [orderedSnips, index, isShuffled, snips, advance, viewMode])
 
   const handlePrev = useCallback(() => {
     setIndex((i) => (i - 1 + orderedSnips.length) % orderedSnips.length)
     if (!viewMode) setRevealed(false)
   }, [orderedSnips.length, viewMode])
+
+  const handleToggleShuffle = useCallback(() => {
+    const next = !isShuffled
+    setIsShuffled(next)
+    setOrderedSnips(next ? shuffle(snips) : [...snips])
+    setIndex(0)
+    setRevealed(viewMode === true)
+  }, [isShuffled, snips, viewMode])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -168,11 +187,28 @@ export function LoopCarousel({
           <span className="text-sm text-[#93a1a1] dark:text-[#586e75]">
             {index + 1} / {orderedSnips.length}
           </span>
-          {!viewMode && !onIncrementXpForSnip && (
-            <span className="text-sm font-medium text-[#b58900]">
-              {displayXp} XP
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {!viewMode && (
+              <button
+                onClick={handleToggleShuffle}
+                aria-label="Toggle shuffle"
+                title={isShuffled ? 'Shuffled — click to sort' : 'Sorted — click to shuffle'}
+                className={`transition-colors ${isShuffled ? 'text-[#268bd2]' : 'text-[#93a1a1] dark:text-[#586e75]'} hover:text-[#268bd2]`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 3 21 3 21 8" />
+                  <line x1="4" y1="20" x2="21" y2="3" />
+                  <polyline points="21 16 21 21 16 21" />
+                  <line x1="15" y1="15" x2="21" y2="21" />
+                </svg>
+              </button>
+            )}
+            {!viewMode && !noXp && !onIncrementXpForSnip && (
+              <span className="text-sm font-medium text-[#b58900]">
+                {displayXp} XP
+              </span>
+            )}
+          </div>
           <button
             onClick={onExit}
             className="text-sm text-[#93a1a1] hover:text-[#657b83] dark:text-[#586e75] dark:hover:text-[#93a1a1]"

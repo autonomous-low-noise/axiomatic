@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
@@ -25,6 +25,14 @@ interface ContextMenuState {
 
 // Module-level cache: survives component unmount/remount within the same session
 const _filterCache = { search: '', dirFilter: 'all', selectedTags: [] as string[] }
+
+/** @internal — test-only reset */
+// eslint-disable-next-line react-refresh/only-export-components
+export function _resetFilterCache() {
+  _filterCache.search = ''
+  _filterCache.dirFilter = 'all'
+  _filterCache.selectedTags = []
+}
 
 export function SnipsPage() {
   const navigate = useNavigate()
@@ -58,7 +66,6 @@ export function SnipsPage() {
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
   const [loopOpen, setLoopOpen] = useState(false)
-  const [loopShuffled, setLoopShuffled] = useState(true)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [selectMode, setSelectMode] = useState(false)
@@ -98,7 +105,7 @@ export function SnipsPage() {
     if (dirFilter !== 'all') result = result.filter((s) => s.dirPath === dirFilter)
     if (selectedTags.length > 0) {
       const tagSet = new Set(selectedTags)
-      result = result.filter((s) => s.tags.some((t) => tagSet.has(t)))
+      result = result.filter((s) => [...tagSet].every((t) => s.tags.includes(t)))
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
@@ -438,18 +445,11 @@ export function SnipsPage() {
         </div>
 
         <button
-          onClick={() => { setLoopShuffled(false); setLoopOpen(true) }}
+          onClick={() => setLoopOpen(true)}
           disabled={filteredSnips.length === 0}
           className="h-7 shrink-0 rounded border border-[#268bd2]/50 bg-[#268bd2]/10 px-3 text-xs font-medium text-[#268bd2] transition-colors hover:bg-[#268bd2]/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#268bd2]/30 dark:bg-[#268bd2]/10 dark:hover:bg-[#268bd2]/20"
         >
-          Loop sorted
-        </button>
-        <button
-          onClick={() => { setLoopShuffled(true); setLoopOpen(true) }}
-          disabled={filteredSnips.length === 0}
-          className="h-7 shrink-0 rounded border border-[#268bd2]/50 bg-[#268bd2]/10 px-3 text-xs font-medium text-[#268bd2] transition-colors hover:bg-[#268bd2]/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#268bd2]/30 dark:bg-[#268bd2]/10 dark:hover:bg-[#268bd2]/20"
-        >
-          Loop shuffled
+          Loop
         </button>
 
         {/* Tag manager button */}
@@ -772,6 +772,22 @@ export function SnipsPage() {
               await removeTag(contextMenu.snip.dirPath, contextMenu.snip.id, tag)
             }
           }}
+          onCreateTag={async (name) => {
+            const color = ['#dc322f', '#cb4b16', '#b58900', '#859900', '#2aa198', '#268bd2', '#6c71c4', '#d33682'][tagDefs.length % 8]
+            await handleCreateDef(name, color)
+            // Also assign the tag to the snip(s)
+            if (selectedIds.has(contextMenu.snip.id) && selectedIds.size > 1) {
+              const byDir = new Map<string, string[]>()
+              for (const s of selectedSnips) {
+                const ids = byDir.get(s.dirPath) ?? []
+                ids.push(s.id)
+                byDir.set(s.dirPath, ids)
+              }
+              for (const [dirPath, ids] of byDir) await bulkAddTag(dirPath, ids, name)
+            } else {
+              await addTag(contextMenu.snip.dirPath, contextMenu.snip.id, name)
+            }
+          }}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -831,7 +847,8 @@ export function SnipsPage() {
             onIncrementXp={async () => 0}
             onIncrementXpForSnip={incrementXpForSnip}
             onExit={() => setLoopOpen(false)}
-            shuffled={loopShuffled}
+            shuffled={false}
+            noXp={true}
           />
         </div>
       )}
@@ -871,7 +888,7 @@ export function SnipsPage() {
 // Extracted context menu with tag checkboxes, rename, delete
 function ContextMenu({
   x, y, snip, tagDefs, bulkSnips,
-  onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onClose,
+  onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onCreateTag, onClose,
 }: {
   x: number
   y: number
@@ -885,9 +902,21 @@ function ContextMenu({
   onDelete: () => void
   onAddTag: (tag: string) => void
   onRemoveTag: (tag: string) => void
+  onCreateTag: (name: string) => void
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const [newTagName, setNewTagName] = useState('')
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    setPos({
+      left: Math.max(4, Math.min(x, window.innerWidth - rect.width - 4)),
+      top: Math.max(4, Math.min(y, window.innerHeight - rect.height - 4)),
+    })
+  }, [x, y])
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -909,8 +938,8 @@ function ContextMenu({
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-50 min-w-[180px] rounded-md border border-[#eee8d5] bg-[#fdf6e3] py-1 shadow-lg dark:border-[#073642] dark:bg-[#073642]"
-      style={{ left: x, top: y }}
+      className="fixed z-50 max-h-[80vh] min-w-[180px] overflow-y-auto rounded-md border border-[#eee8d5] bg-[#fdf6e3] py-1 shadow-lg dark:border-[#073642] dark:bg-[#073642]"
+      style={pos ? { left: pos.left, top: pos.top } : { left: x, top: y, opacity: 0 }}
     >
       <button
         onClick={onView}
@@ -943,31 +972,48 @@ function ContextMenu({
         Delete
       </button>
 
-      {tagDefs.length > 0 && (
-        <div className="border-t border-[#eee8d5] py-1 dark:border-[#073642]">
-          <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#93a1a1] dark:text-[#657b83]">
-            {bulkSnips ? `Tag ${bulkSnips.length} snips` : 'Tags'}
-          </p>
-          {tagDefs.map((def) => {
-            const assigned = snipTags.has(def.name)
-            return (
-              <label
-                key={def.name}
-                className="flex cursor-pointer items-center gap-2 px-3 py-1 hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
-              >
-                <input
-                  type="checkbox"
-                  checked={assigned}
-                  onChange={() => assigned ? onRemoveTag(def.name) : onAddTag(def.name)}
-                  className="accent-[#268bd2]"
-                />
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: def.color }} />
-                <span className="text-sm text-[#586e75] dark:text-[#93a1a1]">{def.name}</span>
-              </label>
-            )
-          })}
+      <div className="border-t border-[#eee8d5] py-1 dark:border-[#073642]">
+        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#93a1a1] dark:text-[#657b83]">
+          {bulkSnips ? `Tag ${bulkSnips.length} snips` : 'Tags'}
+        </p>
+        {tagDefs.map((def) => {
+          const assigned = snipTags.has(def.name)
+          return (
+            <label
+              key={def.name}
+              className="flex cursor-pointer items-center gap-2 px-3 py-1 hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
+            >
+              <input
+                type="checkbox"
+                checked={assigned}
+                onChange={() => assigned ? onRemoveTag(def.name) : onAddTag(def.name)}
+                className="accent-[#268bd2]"
+              />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: def.color }} />
+              <span className="text-sm text-[#586e75] dark:text-[#93a1a1]">{def.name}</span>
+            </label>
+          )
+        })}
+        <div className="px-3 pt-1">
+          <input
+            type="text"
+            value={newTagName}
+            onChange={(e) => setNewTagName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const name = newTagName.trim()
+                if (name) {
+                  onCreateTag(name)
+                  setNewTagName('')
+                }
+              }
+              if (e.key !== 'Escape') e.stopPropagation()
+            }}
+            placeholder="New tag…"
+            className="h-6 w-full rounded border border-[#93a1a1]/30 bg-transparent px-2 text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
+          />
         </div>
-      )}
+      </div>
     </div>,
     document.body,
   )
