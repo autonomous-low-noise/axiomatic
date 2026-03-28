@@ -18,14 +18,11 @@ import app.tauri.plugin.Plugin
 @TauriPlugin
 class FolderPickerPlugin(private val activity: Activity) : Plugin(activity) {
 
-    private var pendingPickInvoke: Invoke? = null
-
     @Command
     fun pickFolder(invoke: Invoke) {
         try {
             // On Android 11+, we need MANAGE_EXTERNAL_STORAGE for walkdir/fs access
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                pendingPickInvoke = invoke
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                 intent.data = Uri.parse("package:${activity.packageName}")
                 startActivityForResult(invoke, intent, "storagePermissionResult")

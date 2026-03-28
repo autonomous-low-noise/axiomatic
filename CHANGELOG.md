@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.0.11
+
+### Android mobile support
+
+Full Tauri 2 Android adaptation. Snips created on desktop render on mobile and vice versa.
+
+**Platform infrastructure**
+- Android project template (`gen/android/`) with Gradle build, NDK cross-compilation
+- PDFium `aarch64` shared library bundled via Gradle `jniLibs`
+- Platform detection module (`platform.ts`) with mobile/desktop classification
+- Adaptive render config: lower DPR, concurrency, and buffer on mobile
+- Android-specific PDFium URL scheme (`http://pdfium.localhost`)
+- `tauri.android.conf.json` disables transparent window on Android
+
+**Native Android integrations**
+- `FolderPickerPlugin` (Kotlin): `ACTION_OPEN_DOCUMENT_TREE` directory picker with tree URI → filesystem path resolution and `MANAGE_EXTERNAL_STORAGE` runtime permission flow
+- Solarized status/navigation bar colors via Android themes
+- Safe area insets (`viewport-fit=cover` + CSS `env()`)
+- Custom app icon (all mipmap densities + adaptive foreground)
+- `folder_picker.rs`: Tauri plugin bridge exposing `pick_folder` command
+
+**Mobile UX**
+- Touch gesture hooks: `useSwipe` (left/right/tap) and `usePinchZoom` (two-finger)
+- Swipe navigation in carousel (left=next, right=prev, tap=reveal)
+- Swipe handler respects scrollable containers (no conflict with image pan)
+- Mobile-responsive toolbars (`overflow-x-auto`, tighter padding)
+- Responsive search inputs (`w-28` base, `sm:w-48`/`sm:w-52`)
+- Mobile layout: no titlebar, no padding, no rounded corners
+- Icon-only buttons with 44px min touch targets in carousel
+
+**Cross-device snip portability**
+- `SnipImage` resolves `full_path` by filename matching via `pathMap` prop
+- `pathMap` threaded through `ZoomableSnipImage`, `LoopCarousel`, `SnipsPage`, `LoopPage`
+
+**Rust changes**
+- `tauri-plugin-single-instance` gated behind `cfg(not(mobile))`
+- Render worker count: 2 on mobile, 4 on desktop
+- `import_pdf_register` command for mobile library directory bootstrap
+
+### Tests
+
+- **New**: Layout platform tests (5), `useSwipe` tests (5), `usePinchZoom` tests (5), `pdfium-url` tests (6), `platform` tests (5), `render-config` tests (4), `thumbnail-queue` `setMaxConcurrent` test.
+- **399 Vitest tests**, 73 Rust tests — all passing.
+
 ## v0.0.10
 
 ### Carousel shuffle toggle & re-shuffle
