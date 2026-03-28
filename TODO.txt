@@ -1,0 +1,29 @@
+- refresh overview for new docs
+- page counter buggy
+- untag does not remove selection
+- partial selector should first deselect
+- snip table should show item count
+- jump from snip to pdf page
+- subsequent batch tags should be OR-ed (exception for tags starting with Batch; or handle it in better way)
+- shuffle button bad UX
+- snip table state should persist across app restarts
+- sharper thumbnails in overview page
+- critical bug: shorter pages than A4 are stretched to fill it
+- rename in carousel view
+- when mixing snips between courses: display the tags in the snip (no batch tags)
+- the chime is either random or there isn't singleton cron chime tracker and multiples are dispatched / not cleaned up properly and it randomly goes off.
+- clear snip table tag filters on dir switch
+- last tab is unclosable
+- no "close to the left/right" for tabs
+- not tab reorder
+- no tab ctrl+pgup/down between tab nav
+- consolidate after mobile version
+	- tests. lot's of tests
+	- refactor: strategy pattern?
+	- consolidation iteration
+- snip table view should also sort based on source
+- no "mark pdf as marked" and "mark snip as solid" and no UI for
+	- progress bar how many pdfs are marked per dir
+	- progress bar how many snips are solidified per pdf
+	- tick/visual feedback per dir and per pdf for mark and solidification progress respectively
+		- additional status for snips (besides solidified: open and also needs attention; status: solid|open|attention)
