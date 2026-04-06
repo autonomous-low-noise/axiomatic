@@ -603,7 +603,7 @@ export function SnipsPage() {
                       toggleSelect(snip.id, e.shiftKey)
                     }}
                     onContextMenu={(e) => handleContextMenu(e, snip)}
-                    className={`border-b border-[#eee8d5] transition-colors select-none dark:border-[#073642] ${
+                    className={`border-b border-[#eee8d5] select-none dark:border-[#073642] ${
                       i === selectedIndex
                         ? 'bg-[#eee8d5] dark:bg-[#073642]'
                         : isSelected
