@@ -7,6 +7,8 @@ interface Props {
   onSelect: (slug: string) => void
   onClose: (slug: string) => void
   onCloseOthers: (slug: string) => void
+  onCloseToLeft?: (slug: string) => void
+  onCloseToRight?: (slug: string) => void
 }
 
 interface ContextMenu {
@@ -15,7 +17,7 @@ interface ContextMenu {
   slug: string
 }
 
-export function TabBar({ tabs, activeSlug, onSelect, onClose, onCloseOthers }: Props) {
+export function TabBar({ tabs, activeSlug, onSelect, onClose, onCloseOthers, onCloseToLeft, onCloseToRight }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menu, setMenu] = useState<ContextMenu | null>(null)
@@ -52,7 +54,7 @@ export function TabBar({ tabs, activeSlug, onSelect, onClose, onCloseOthers }: P
     }
   }, [menu])
 
-  if (tabs.length <= 1) return null
+  if (tabs.length === 0) return null
 
   return (
     <>
@@ -142,6 +144,28 @@ export function TabBar({ tabs, activeSlug, onSelect, onClose, onCloseOthers }: P
           >
             Close Others
           </button>
+          {onCloseToLeft && tabs.findIndex((t) => t.slug === menu.slug) > 0 && (
+            <button
+              className="w-full px-3 py-1.5 text-left text-xs text-[#586e75] hover:bg-[#eee8d5] dark:text-[#839496] dark:hover:bg-[#073642]"
+              onClick={() => {
+                onCloseToLeft(menu.slug)
+                setMenu(null)
+              }}
+            >
+              Close to the Left
+            </button>
+          )}
+          {onCloseToRight && tabs.findIndex((t) => t.slug === menu.slug) < tabs.length - 1 && (
+            <button
+              className="w-full px-3 py-1.5 text-left text-xs text-[#586e75] hover:bg-[#eee8d5] dark:text-[#839496] dark:hover:bg-[#073642]"
+              onClick={() => {
+                onCloseToRight(menu.slug)
+                setMenu(null)
+              }}
+            >
+              Close to the Right
+            </button>
+          )}
         </div>
       )}
     </>

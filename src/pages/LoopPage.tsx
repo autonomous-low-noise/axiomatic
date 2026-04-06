@@ -26,7 +26,7 @@ export function LoopPage() {
     return map
   }, [textbooks])
   const tabSlug = useMemo(() => `loop:${slug}`, [slug])
-  const { tabs, openTab, closeTabAndNavigate, closeOtherTabsAndNavigate, selectTab } = useTabNavigation(tabSlug)
+  const { tabs, openTab, closeTabAndNavigate, closeOtherTabsAndNavigate, closeTabsToLeftAndNavigate, closeTabsToRightAndNavigate, selectTab } = useTabNavigation(tabSlug)
 
   // Register the loop tab
   useEffect(() => {
@@ -85,6 +85,8 @@ export function LoopPage() {
         onSelect={selectTab}
         onClose={closeTabAndNavigate}
         onCloseOthers={closeOtherTabsAndNavigate}
+        onCloseToLeft={closeTabsToLeftAndNavigate}
+        onCloseToRight={closeTabsToRightAndNavigate}
       />
       <div className="flex shrink-0 items-center justify-end border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
         <PomodoroTimer zenMode={false} activeSlug={slug} activeDirPath={book?.dir_path} />

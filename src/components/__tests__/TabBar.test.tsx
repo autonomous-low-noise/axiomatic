@@ -23,8 +23,21 @@ function renderTabBar(overrides: Partial<Parameters<typeof TabBar>[0]> = {}) {
 }
 
 describe('TabBar', () => {
-  it('renders nothing when only one tab', () => {
+  it('renders nothing when zero tabs', () => {
     const { container } = render(
+      <TabBar
+        tabs={[]}
+        activeSlug={null}
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+        onCloseOthers={vi.fn()}
+      />,
+    )
+    expect(container.innerHTML).toBe('')
+  })
+
+  it('renders single tab with close button', () => {
+    render(
       <TabBar
         tabs={[tabs[0]]}
         activeSlug="book-a"
@@ -33,7 +46,8 @@ describe('TabBar', () => {
         onCloseOthers={vi.fn()}
       />,
     )
-    expect(container.innerHTML).toBe('')
+    expect(screen.getByText('Linear Algebra')).toBeInTheDocument()
+    expect(screen.getByLabelText('Close Linear Algebra')).toBeInTheDocument()
   })
 
   it('renders all tab titles', () => {
@@ -100,5 +114,41 @@ describe('TabBar', () => {
     fireEvent.contextMenu(tab)
     fireEvent.click(screen.getByText('Close Others'))
     expect(onCloseOthers).toHaveBeenCalledWith('book-b')
+  })
+
+  it('context menu shows Close to the Left for non-first tab', () => {
+    const onCloseToLeft = vi.fn()
+    renderTabBar({ onCloseToLeft })
+    const tab = screen.getAllByRole('tab')[1] // Real Analysis (middle)
+    fireEvent.contextMenu(tab)
+    expect(screen.getByText('Close to the Left')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Close to the Left'))
+    expect(onCloseToLeft).toHaveBeenCalledWith('book-b')
+  })
+
+  it('context menu hides Close to the Left for first tab', () => {
+    const onCloseToLeft = vi.fn()
+    renderTabBar({ onCloseToLeft })
+    const tab = screen.getAllByRole('tab')[0] // Linear Algebra (first)
+    fireEvent.contextMenu(tab)
+    expect(screen.queryByText('Close to the Left')).not.toBeInTheDocument()
+  })
+
+  it('context menu shows Close to the Right for non-last tab', () => {
+    const onCloseToRight = vi.fn()
+    renderTabBar({ onCloseToRight })
+    const tab = screen.getAllByRole('tab')[1] // Real Analysis (middle)
+    fireEvent.contextMenu(tab)
+    expect(screen.getByText('Close to the Right')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Close to the Right'))
+    expect(onCloseToRight).toHaveBeenCalledWith('book-b')
+  })
+
+  it('context menu hides Close to the Right for last tab', () => {
+    const onCloseToRight = vi.fn()
+    renderTabBar({ onCloseToRight })
+    const tab = screen.getAllByRole('tab')[2] // Topology (last)
+    fireEvent.contextMenu(tab)
+    expect(screen.queryByText('Close to the Right')).not.toBeInTheDocument()
   })
 })

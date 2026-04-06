@@ -14,10 +14,10 @@
 - when mixing snips between courses: display the tags in the snip (no batch tags)
 - the chime is either random or there isn't singleton cron chime tracker and multiples are dispatched / not cleaned up properly and it randomly goes off.
 - [DONE] clear snip table tag filters on dir switch
-- last tab is unclosable
-- no "close to the left/right" for tabs
+- [DONE] last tab is unclosable
+- [DONE] no "close to the left/right" for tabs
 - not tab reorder
-- no tab ctrl+pgup/down between tab nav
+- [DONE] no tab ctrl+pgup/down between tab nav
 - consolidate after mobile version
 	- tests. lot's of tests
 	- refactor: strategy pattern?

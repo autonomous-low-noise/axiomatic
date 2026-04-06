@@ -104,6 +104,28 @@ export function useTabs() {
     store.emitChange()
   }, [])
 
+  const closeTabsToLeft = useCallback((slug: string): void => {
+    const current = loadTabs()
+    const idx = current.tabs.findIndex((t) => t.slug === slug)
+    if (idx <= 0) return
+    const closed = current.tabs.splice(0, idx)
+    for (const tab of closed) closedTabsStack.push(tab)
+    current.activeSlug = slug
+    saveTabs(current)
+    store.emitChange()
+  }, [])
+
+  const closeTabsToRight = useCallback((slug: string): void => {
+    const current = loadTabs()
+    const idx = current.tabs.findIndex((t) => t.slug === slug)
+    if (idx === -1 || idx === current.tabs.length - 1) return
+    const closed = current.tabs.splice(idx + 1)
+    for (const tab of closed) closedTabsStack.push(tab)
+    current.activeSlug = slug
+    saveTabs(current)
+    store.emitChange()
+  }, [])
+
   const setActiveTab = useCallback((slug: string) => {
     const current = loadTabs()
     if (current.tabs.some((t) => t.slug === slug)) {
@@ -119,6 +141,8 @@ export function useTabs() {
     openTab,
     closeTab,
     closeOtherTabs,
+    closeTabsToLeft,
+    closeTabsToRight,
     reopenTab,
     setActiveTab,
   }
@@ -159,5 +183,21 @@ export function useTabNavigation(currentSlug: string | undefined) {
     }
   }, [tabState, navigate, currentSlug])
 
-  return { ...tabState, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate }
+  const closeTabsToLeftAndNavigate = useCallback((slug: string) => {
+    tabState.closeTabsToLeft(slug)
+    if (slug !== currentSlug) {
+      const tab = tabsRef.current.find((t) => t.slug === slug)
+      navigate(tab?.route || `/read/${slug}`)
+    }
+  }, [tabState, navigate, currentSlug])
+
+  const closeTabsToRightAndNavigate = useCallback((slug: string) => {
+    tabState.closeTabsToRight(slug)
+    if (slug !== currentSlug) {
+      const tab = tabsRef.current.find((t) => t.slug === slug)
+      navigate(tab?.route || `/read/${slug}`)
+    }
+  }, [tabState, navigate, currentSlug])
+
+  return { ...tabState, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate, closeTabsToLeftAndNavigate, closeTabsToRightAndNavigate }
 }

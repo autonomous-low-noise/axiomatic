@@ -38,7 +38,7 @@ export function ReaderPage() {
   const { docInfo, loading: docLoading, error: docError } = useDocument(book?.full_path)
   const { colorHighlights, bookmarkHighlights, highlightsForPage, createHighlight, deleteHighlight, deleteHighlightGroup } = useHighlights(slug)
   const { snips, addSnip } = useSnips(slug, book?.dir_path)
-  const { tabs, openTab, reopenTab, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate } = useTabNavigation(slug)
+  const { tabs, openTab, reopenTab, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate, closeTabsToLeftAndNavigate, closeTabsToRightAndNavigate } = useTabNavigation(slug)
 
   const [snipMode, setSnipMode] = useState(false)
   const [snipToast, setSnipToast] = useState<string | null>(null)
@@ -224,6 +224,16 @@ export function ReaderPage() {
         const idx = currentTabs.findIndex((t) => t.slug === slug)
         if (idx > 0) selectTab(currentTabs[idx - 1].slug)
       } else if (e.shiftKey && e.altKey && (e.key === 'L' || e.key === 'l')) {
+        e.preventDefault()
+        const currentTabs = tabsRef.current
+        const idx = currentTabs.findIndex((t) => t.slug === slug)
+        if (idx >= 0 && idx < currentTabs.length - 1) selectTab(currentTabs[idx + 1].slug)
+      } else if (mod && e.key === 'PageUp') {
+        e.preventDefault()
+        const currentTabs = tabsRef.current
+        const idx = currentTabs.findIndex((t) => t.slug === slug)
+        if (idx > 0) selectTab(currentTabs[idx - 1].slug)
+      } else if (mod && e.key === 'PageDown') {
         e.preventDefault()
         const currentTabs = tabsRef.current
         const idx = currentTabs.findIndex((t) => t.slug === slug)
@@ -424,6 +434,8 @@ export function ReaderPage() {
           onSelect={selectTab}
           onClose={closeTabAndNavigate}
           onCloseOthers={closeOtherTabsAndNavigate}
+          onCloseToLeft={closeTabsToLeftAndNavigate}
+          onCloseToRight={closeTabsToRightAndNavigate}
         />
       )}
       <div className="flex min-h-0 flex-1">

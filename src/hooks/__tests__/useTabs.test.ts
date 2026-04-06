@@ -218,4 +218,52 @@ describe('useTabs', () => {
     expect(result.current.tabs[0].slug).toBe('book_b')
     expect(result.current.activeSlug).toBe('book_b')
   })
+
+  it('closeTabsToLeft removes tabs before the specified tab', () => {
+    const { result } = renderHook(() => useTabs())
+
+    act(() => { result.current.openTab(makeTab('book_a')) })
+    act(() => { result.current.openTab(makeTab('book_b')) })
+    act(() => { result.current.openTab(makeTab('book_c')) })
+
+    act(() => { result.current.closeTabsToLeft('book_c') })
+
+    expect(result.current.tabs.map((t) => t.slug)).toEqual(['book_c'])
+    expect(result.current.activeSlug).toBe('book_c')
+  })
+
+  it('closeTabsToLeft is a no-op for the first tab', () => {
+    const { result } = renderHook(() => useTabs())
+
+    act(() => { result.current.openTab(makeTab('book_a')) })
+    act(() => { result.current.openTab(makeTab('book_b')) })
+
+    act(() => { result.current.closeTabsToLeft('book_a') })
+
+    expect(result.current.tabs.map((t) => t.slug)).toEqual(['book_a', 'book_b'])
+  })
+
+  it('closeTabsToRight removes tabs after the specified tab', () => {
+    const { result } = renderHook(() => useTabs())
+
+    act(() => { result.current.openTab(makeTab('book_a')) })
+    act(() => { result.current.openTab(makeTab('book_b')) })
+    act(() => { result.current.openTab(makeTab('book_c')) })
+
+    act(() => { result.current.closeTabsToRight('book_a') })
+
+    expect(result.current.tabs.map((t) => t.slug)).toEqual(['book_a'])
+    expect(result.current.activeSlug).toBe('book_a')
+  })
+
+  it('closeTabsToRight is a no-op for the last tab', () => {
+    const { result } = renderHook(() => useTabs())
+
+    act(() => { result.current.openTab(makeTab('book_a')) })
+    act(() => { result.current.openTab(makeTab('book_b')) })
+
+    act(() => { result.current.closeTabsToRight('book_b') })
+
+    expect(result.current.tabs.map((t) => t.slug)).toEqual(['book_a', 'book_b'])
+  })
 })
