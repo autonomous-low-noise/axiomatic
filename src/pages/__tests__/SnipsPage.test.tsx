@@ -359,9 +359,9 @@ describe('SnipsPage', () => {
     fireEvent.contextMenu(row)
     fireEvent.click(screen.getByText('Expand'))
 
-    // Page 4 (0-indexed) should display as 5
+    // Page is 1-based, so page=4 should display as 4
     expect(screen.getByText((_, el) =>
-      el?.tagName === 'P' && /Page:/.test(el.textContent ?? '') && el.textContent?.includes('5') === true,
+      el?.tagName === 'P' && /Page:/.test(el.textContent ?? '') && el.textContent?.includes('4') === true,
     )).toBeInTheDocument()
 
     // Source should resolve via slugToTitle to "Linear Algebra"

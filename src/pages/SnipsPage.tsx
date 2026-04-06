@@ -303,7 +303,7 @@ export function SnipsPage() {
   }, [selectedIds, filteredSnips])
 
   const selectAll = useCallback(() => {
-    if (selectedIds.size === filteredSnips.length) {
+    if (selectedIds.size > 0) {
       setSelectedIds(new Set())
     } else {
       setSelectedIds(new Set(filteredSnips.map((s) => s.id)))
@@ -650,7 +650,7 @@ export function SnipsPage() {
                       {slugToTitle[snip.slug] ?? snip.slug}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums text-[#586e75] dark:text-[#93a1a1]">
-                      {snip.page + 1}
+                      {snip.page}
                     </td>
                     <td className="px-4 py-2">
                       {snip.tags.length > 0 ? (
@@ -687,7 +687,7 @@ export function SnipsPage() {
                           <ZoomableSnipImage snip={snip} maxHeight="200px" pathMap={pathMap} dirPath={snip.dirPath} />
                           <div className="flex flex-col gap-2 text-sm text-[#586e75] dark:text-[#93a1a1]">
                             <p><span className="font-medium">Source:</span> {slugToTitle[snip.slug] ?? snip.slug}</p>
-                            <p><span className="font-medium">Page:</span> {snip.page + 1}</p>
+                            <p><span className="font-medium">Page:</span> {snip.page}</p>
                             <p><span className="font-medium">Region:</span> ({(snip.x * 100).toFixed(0)}%, {(snip.y * 100).toFixed(0)}%) {(snip.width * 100).toFixed(0)}%×{(snip.height * 100).toFixed(0)}%</p>
                             <div className="mt-2 flex gap-2">
                               <button
@@ -732,7 +732,7 @@ export function SnipsPage() {
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          snip={contextMenu.snip}
+          snip={snips.find((s) => s.id === contextMenu.snip.id) ?? contextMenu.snip}
           tagDefs={tagDefs}
           onView={() => {
             const idx = filteredSnips.findIndex((s) => s.id === contextMenu.snip.id)
