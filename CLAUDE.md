@@ -1,6 +1,10 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Axiomatic
 
-Solarized-themed desktop PDF reader for math textbooks. Tauri 2 + React 19 + TypeScript.
+Solarized-themed desktop + mobile PDF reader for math textbooks. Tauri 2 + React 19 + TypeScript.
 
 ## Quick reference
 
@@ -8,30 +12,49 @@ Solarized-themed desktop PDF reader for math textbooks. Tauri 2 + React 19 + Typ
 src/pages/OverviewPage.tsx       — library grid (starred section + per-directory sections)
 src/pages/ReaderPage.tsx         — PDF viewer + notes split-pane + tabs + snip mode
 src/pages/LoopPage.tsx           — snip review carousel (sorted/shuffled modes)
-src/components/PdfThumbnail.tsx  — lazy thumbnail via pdfium:// protocol
+src/pages/SnipsPage.tsx          — cross-book snip browsing, filtering, bulk tagging
+src/pages/StatsPage.tsx          — study statistics dashboard (XP, sessions, progress)
 src/components/PdfViewer.tsx     — virtual-scroll PDF renderer (buffer=5 pages, imperative zoom)
 src/components/NotesPanel.tsx    — CodeMirror 6 with vim, markdown, KaTeX math
 src/components/TabBar.tsx        — horizontal tab strip with context menu (close, close others)
-src/components/HighlightsPanel.tsx — highlights list pane (grouped by page)
-src/components/BookmarksPanel.tsx  — bookmarks list pane (highlights with color="bookmark")
+src/components/AnnotationPanel.tsx — unified highlights + bookmarks list (variant prop)
+src/components/OutlineSidebar.tsx — PDF outline/TOC sidebar with collapsible sections
 src/components/CommandPalette.tsx — Ctrl+P command palette (panel toggles, theme, zen mode, snip, loop)
-src/components/ReaderToolbar.tsx — reader toolbar (back, page counter, zoom, search, palette button)
+src/components/ReaderToolbar.tsx — reader toolbar (back, page counter, zoom, search, pomodoro, palette)
 src/components/SnipOverlay.tsx   — drag-to-select crosshair overlay for snip region capture
 src/components/SnipBanner.tsx    — inline label input banner shown after snip region selection
 src/components/LoopCarousel.tsx  — flashcard carousel with reveal, prev/next, XP tracking
+src/components/ZoomableSnipImage.tsx — pinch/scroll-zoomable snip region viewer
+src/components/PomodoroTimer.tsx — study timer with presets and break notifications
+src/components/BreakOverlay.tsx  — pomodoro break notification overlay
+src/components/SnipTagManager.tsx — snip tag CRUD management
+src/components/SnipTagAssigner.tsx — tag assignment UI for snips
+src/components/StudyStats.tsx    — XP/study statistics visualization
+src/components/DirectoryExplorer.tsx — library directory management UI
+src/components/SlugMigrationDialog.tsx — orphan slug detection + migration dialog
 src/lib/thumbnail-queue.ts      — concurrency limiter (MAX_CONCURRENT=3)
 src/lib/palette.ts              — module-level toggle callback for command palette
 src/lib/readerState.ts          — module-level store bridging ReaderPage state to Layout/palette
+src/lib/platform.ts             — platform detection (mobile/desktop classification)
+src/lib/pdfium-url.ts           — pdfium:// URL builder (desktop) / http://pdfium.localhost (Android)
+src/lib/render-config.ts        — adaptive render config (DPR, concurrency, buffer per platform)
 src/hooks/useTheme.ts           — theme store with setTheme() export for direct setting
 src/hooks/useSnips.ts           — snip CRUD + XP tracking (IPC → .axiomatic/ JSON)
-src/components/SlugMigrationDialog.tsx — orphan slug detection + migration dialog
+src/hooks/usePomodoroTimer.ts   — pomodoro session state + timer logic
+src/hooks/useSnipTagDefs.ts     — snip tag definitions CRUD
+src/hooks/useSwipe.ts           — touch swipe gesture detection (left/right/tap)
+src/hooks/usePinchZoom.ts       — two-finger pinch zoom gesture handling
+src/extensions/                 — CodeMirror 6 plugins (editor-theme, image-paste, math-decoration)
 src-tauri/src/commands.rs        — general Tauri IPC commands (db, files, tags, project state)
 src-tauri/src/highlight_commands.rs — highlight CRUD IPC commands
-src-tauri/src/snip_commands.rs   — snip CRUD IPC commands
+src-tauri/src/snip_commands.rs   — snip CRUD IPC commands (tags, bulk ops)
+src-tauri/src/session_commands.rs — pomodoro session logging IPC commands
 src-tauri/src/pdf_commands.rs    — PDF-specific IPC commands (open, outline, links, text, search, clip)
 src-tauri/src/pdf_engine.rs      — PDFium render thread (mpsc recv loop, LRU cache)
 src-tauri/src/pdf_protocol.rs    — pdfium:// custom protocol handler
-src-tauri/src/db.rs              — SQLite schema + versioned migration framework (directories, notes, note_images, tags, highlights)
+src-tauri/src/json_storage.rs    — JSON file storage abstraction for .axiomatic/ state
+src-tauri/src/db.rs              — SQLite schema + versioned migration framework
+src-tauri/src/folder_picker.rs   — native folder picker (Android ACTION_OPEN_DOCUMENT_TREE bridge)
 ```
 
 ## Architecture
@@ -43,7 +66,7 @@ React (Vite + SWC)  <──IPC──>  Tauri/Rust  <───>  SQLite
 
 PDF rendering uses PDFium (C library) via `pdfium-render` crate. Pages served as JPEG via `pdfium://` custom protocol. Render thread handles page rendering, text extraction, outlines, links, search, and clipping. Document open runs on `spawn_blocking` (off the render thread) for instant response.
 
-Routes: `/` OverviewPage, `/read/:slug` ReaderPage, `/loop/:slug` LoopPage. Layout wraps all with custom Titlebar.
+Routes: `/` OverviewPage, `/read/:slug` ReaderPage, `/loop/:slug` LoopPage, `/snips` SnipsPage, `/stats` StatsPage. Layout wraps all with custom Titlebar.
 
 ## State management
 
@@ -56,6 +79,8 @@ Routes: `/` OverviewPage, `/read/:slug` ReaderPage, `/loop/:slug` LoopPage. Layo
 | Theme | localStorage | custom store with OS detection (dbus + matchMedia) |
 | Notes | SQLite | in-memory Map cache, 150ms debounced writes |
 | Highlights | SQLite | `useHighlights` hook, bookmarks stored as `color="bookmark"` |
+| Snip tags | `.axiomatic/snip_tag_defs.json` | IPC `create_snip_tag_def`/`list_snip_tag_defs`, per-snip tag arrays |
+| Pomodoro sessions | `.axiomatic/sessions.json` | IPC `log_session`/`list_sessions`, per-slug session history |
 | Tabs | localStorage | `useTabs` hook with reopen stack + `useTabNavigation` for route-aware nav |
 
 `createLocalStorageStore` (lib/createStore.ts) is a generic factory for remaining localStorage state (theme, tabs): `load()` returns parsed snapshot, `emitChange()` re-reads from localStorage and notifies subscribers.
@@ -80,6 +105,7 @@ Routes: `/` OverviewPage, `/read/:slug` ReaderPage, `/loop/:slug` LoopPage. Layo
 - Always: theme switching (OS / light / dark)
 - Reader only: toggle outline, notes, bookmarks, highlights, zen mode, snip mode
 - Reader only (when snips exist): loop sorted, loop shuffled
+- Overview: stats page navigation
 
 Panel toggle commands dispatch `CustomEvent` on `window` (e.g. `axiomatic:toggle-outline`), listened to by `ReaderPage`. The palette button uses a module-level callback (`src/lib/palette.ts`) to avoid circular imports between `router.tsx` and page/component modules.
 
@@ -99,6 +125,22 @@ Panel toggle commands dispatch `CustomEvent` on `window` (e.g. `axiomatic:toggle
 
 **Route-aware tabs** — `OpenTab` now carries a `route` field. `useTabNavigation` wraps `useTabs` with `navigate()` calls that respect the stored route, enabling non-reader tabs (e.g. loop tabs with slug `loop:{slug}`).
 
+## Pomodoro & study statistics
+
+**Pomodoro timer** — `PomodoroTimer` component with configurable presets (25/5, 50/10, custom). `usePomodoroTimer` manages countdown state, auto-transitions between work/break phases, and fires `BreakOverlay` notifications. Sessions logged to `.axiomatic/sessions.json` via `session_commands.rs`.
+
+**Study stats** — `StatsPage` (`/stats`) shows XP aggregation, session history, and per-directory progress. `StudyStats` component renders the dashboard on OverviewPage as well.
+
+## Snip tags & cross-book filtering
+
+**Snip tags** — tag definitions stored in `.axiomatic/snip_tag_defs.json` (name + color). Tags assigned per-snip as string arrays. `SnipTagManager` for CRUD, `SnipTagAssigner` for assignment. Bulk tag operations supported via context menu in SnipsPage.
+
+**Cross-book snips** — `SnipsPage` (`/snips`) aggregates snips across all library directories. Supports AND tag filtering, search, vim navigation (j/k), and inline loop overlay carousel.
+
+## Mobile support (Android)
+
+Platform detection via `src/lib/platform.ts`. Adaptive render config (lower DPR, concurrency, buffer on mobile). Touch gestures: `useSwipe` (left/right/tap navigation), `usePinchZoom` (two-finger zoom). `ZoomableSnipImage` for pinch-zoomable snip regions. Android uses `http://pdfium.localhost` instead of `pdfium://` protocol. `FolderPickerPlugin` (Kotlin) for native directory picker.
+
 ## Conventions
 
 - Solarized palette: hard-coded hex values (`#fdf6e3` light bg, `#002b36` dark bg, etc.)
@@ -115,10 +157,18 @@ Panel toggle commands dispatch `CustomEvent` on `window` (e.g. `axiomatic:toggle
 npm run dev          # tauri dev (vite + rust)
 npm run build        # tauri build
 npm run vite:dev     # vite only (no tauri)
+npm run vite:build   # tsc -b + vite build (no tauri)
 npx tsc -b           # type-check (same as build uses)
 npm run lint         # eslint
-npm run test         # vitest unit tests
-cargo test --lib     # rust unit tests (from src-tauri/)
+npm run test         # vitest unit tests (399 tests)
+npm run test:e2e     # playwright E2E tests (requires vite dev server)
+cargo test --lib     # rust unit tests (73 tests, from src-tauri/)
+
+# Run a single vitest file
+npx vitest run src/hooks/__tests__/useVimReader.test.ts
+
+# Run a single rust test
+cd src-tauri && cargo test --lib test_name
 ```
 
 ## Release workflow
@@ -128,6 +178,11 @@ cargo test --lib     # rust unit tests (from src-tauri/)
 git push origin master --tags     # push commit + tag → triggers CI release
 ```
 
+## CI/CD
+
+- `.github/workflows/ci.yml` — lint, typecheck, vitest, rust tests on push/PR
+- `.github/workflows/release.yml` — full pipeline + tauri build on tag push (AppImage/deb/rpm to GitHub Releases)
+
 ## Known gotchas
 
 - PDFium shared library (`libpdfium.so`/`.dylib`/`.dll`) must be in `src-tauri/resources/` for dev or bundled as a Tauri resource for production. Download from https://github.com/bblanchon/pdfium-binaries.
@@ -135,103 +190,3 @@ git push origin master --tags     # push commit + tag → triggers CI release
 - Bookmarks are highlights with `color = "bookmark"` — `useHighlights` splits them via `colorHighlights` / `bookmarkHighlights`.
 - **Slug migration** — When a PDF is renamed, `detect_orphaned_slugs` finds data referencing unknown slugs and suggests mappings via bigram similarity. `migrate_slug` atomically updates all storage tiers (SQLite + JSON + localStorage tabs). The `SlugMigrationDialog` surfaces after library scan on OverviewPage.
 - **Versioned migrations** — `db.rs` uses a `migrations` table with sequential version numbers. Add new migrations to the `MIGRATIONS` array; `init_db()` runs pending ones on startup.
-
----
-
-# axiomatic-pdfium — DDD Dashboard
-
-> Cache iteration: 35
-
-## Orchestrator Directive
-
-You are the DDD orchestrator. Dispatch phase agents, manage transitions, own global state.
-Commands: /ddd-begin, /ddd-explore, /ddd-spec, /ddd-plan, /ddd-exec, /ddd-gate, /ddd-approve, /ddd-clarify, /ddd-rewind, /ddd-status, /ddd-cache, /ddd-refactor, /ddd-onboard, /ddd-amend, /ddd-migrate.
-
-## Phase & Iteration
-
-Phase: **exec** | Iteration: **35**
-
-## Active Traversals
-
-None
-
-## Artifact Index
-
-### Concept
-
-- `concept/fragment-001.md` — PDF rendering pipeline
-- `concept/fragment-002.md` — Document management
-- `concept/fragment-003.md` — Annotation system
-- `concept/fragment-004.md` — Study features
-- `concept/fragment-005.md` — Navigation & UI
-- `concept/fragment-006.md` — Persistence
-- `concept/fragment-007.md` — Platform concerns
-- `concept/fragment-008.md` — First-class snippet support (seeded from cl-005)
-- `concept/fragment-009.md` — AI-enabled highlights (seeded from cl-006)
-- `concept/fragment-010.md` — Retroactive TDD adoption (seeded from cl-007)
-- `concept/fragment-011.md` — Pomodoro/timer feature (seeded from cl-008)
-- `concept/fragment-012.md` — Cycle 3: Pomodoro UX, Stats Page, Toolbar Buttons, Sidebar Navigation
-- `concept/explore-summary.md` — Explore phase synthesis (cycle 1 + 2)
-- `concept/atoms.yaml` — 61 atoms (49 cycle 1 + 9 cycle 2 + 2 cycle 3 + 1 ProjectStateDir)
-
-### Specs
-
-| Sub-spec | Title | Approval |
-|----------|-------|----------|
-| spec-rendering | PDF Rendering Pipeline | **approved** (iter 27) |
-| spec-text-extraction | Text Extraction & Spatial Model | **approved** (iter 27) |
-| spec-documents | Document Management & Library | **approved** (iter 28) |
-| spec-annotations | Annotation System | **approved** (iter 27) |
-| spec-study | Study Features (Snips, Tags, Filtering & Loop Review) | **approved** (iter 28) |
-| spec-navigation | Navigation & Interaction | **approved** (iter 27) |
-| spec-persistence | Persistence & Storage | **approved** (iter 27) |
-| spec-platform | Platform & Runtime | **approved** (iter 27) |
-| spec-testing | Full-Stack Test Infrastructure | **approved** (iter 25) |
-| spec-pomodoro | Pomodoro Study Timer & Statistics | **approved** (iter 28) |
-
-### Tasks
-
-| Task | Title | Status |
-|------|-------|--------|
-| task-001 | Versioned migration framework | done |
-| task-002 | ProjectStateDir creation & walkdir filtering | done |
-| task-003 | Move BookProgress to .axiomatic/ | done |
-| task-004 | Move StarredSet to .axiomatic/ | done |
-| task-005 | Move Snips to .axiomatic/ | done |
-| task-006 | Move SnipXP to .axiomatic/ | done |
-| task-007 | Slug migration | done |
-| task-008 | Snip tags backend and model update | done |
-| task-009 | Snip table view page with search and navigation | done |
-| task-010 | Snip filtering and cross-book loop overlay | done |
-| task-011 | Pomodoro timer with presets and break notifications | done |
-| task-012 | Pomodoro session logging and XP backend | done |
-| task-013 | Study statistics on OverviewPage | done |
-| task-014 | Rust unit tests for all mutating IPC commands | done (44 tests) |
-| task-015 | Vitest infrastructure and frontend tests | done (52 tests) |
-| task-016 | Playwright E2E infrastructure and happy-path tests | done (22 tests) |
-| task-017 | Fix Pomodoro Timer UX | done |
-| task-018 | Create /stats route and StatsPage | done |
-| task-019 | Surface palette commands as toolbar buttons | done |
-| task-020 | Persistent sidebar navigation | done |
-
-## Open Clarifications
-
-| ID | Topic | Status |
-|----|-------|--------|
-| cl-006 | AI-enabled highlights | **open** (deferred) |
-| cl-009 | Vim navigation consistency (overview, snip overlay, loop overlay) | **open** (deferred) |
-| cl-010 | Zoom consistency (overview thumbnails, snip overlay, loop carousel) | **done** (iter 35) |
-| cl-011 | Toggleable select mode (text selection vs vim nav) | **done** (iter 35) |
-| cl-012 | Zoomable snips (pinch/scroll zoom on snip regions) | **done** (iter 35) |
-| cl-013 | Pomodoro/learning tools missing from SnipsPage loop overlay (overlay bypasses LoopPage infrastructure) | **done** (iter 35) |
-
-## Approval Status
-
-All 10 sub-specs approved (119 ACs, 61 atoms). Plans: cycle 2 **approved** (iter 30, 9 tasks), cycle 3 **approved** (iter 34, 4 tasks). Exec phase active.
-
-## Recent Decisions
-
-- [iter 32] Exec batch: all 9 cycle 2 tasks completed (008–016). 44 Rust tests, 52 Vitest tests, 22 Playwright E2E tests all passing. Cycle 2 complete.
-- [iter 33] Rewind: exec → explore (cycle 3). fragment-012, 2 new atoms (Sidebar, StatsPage), spec amendments (ac-150..157)
-- [iter 34] Fast-forward: explore → exec (cycle 3). 4 tasks (task-017..020), TDD required
-- [iter 35] Exec batch: all 4 cycle 3 tasks completed (017–020). Red-green TDD. 75 Vitest tests, 44 Rust tests all passing. Cycle 3 complete.

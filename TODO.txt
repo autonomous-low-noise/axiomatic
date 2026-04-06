@@ -9,6 +9,7 @@
 - snip table state should persist across app restarts
 - sharper thumbnails in overview page
 - critical bug: shorter pages than A4 are stretched to fill it
+- critical bug: on mobile some snips, e.g pka and mesi point to TML stuff -> snip resolution faulty on mobile
 - rename in carousel view
 - when mixing snips between courses: display the tags in the snip (no batch tags)
 - the chime is either random or there isn't singleton cron chime tracker and multiples are dispatched / not cleaned up properly and it randomly goes off.
