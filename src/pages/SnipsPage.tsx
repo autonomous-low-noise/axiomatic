@@ -392,7 +392,7 @@ export function SnipsPage() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
       {/* Toolbar */}
-      <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-[#eee8d5] bg-[#fdf6e3] px-2 dark:border-[#073642] dark:bg-[#002b36]">
+      <div className="flex h-10 shrink-0 flex-wrap items-center gap-1 border-b border-[#eee8d5] bg-[#fdf6e3] px-2 dark:border-[#073642] dark:bg-[#002b36]">
         <button
           onClick={() => navigate('/')}
           className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
