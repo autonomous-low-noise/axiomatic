@@ -207,6 +207,7 @@ export function OverviewPage() {
   const handleContextMenu = useCallback(
     (slug: string, x: number, y: number) => {
       setMenu({ x, y, slug })
+      setStatusPickerSlug(null)
     },
     [],
   )
@@ -594,7 +595,7 @@ export function OverviewPage() {
         />
       )}
       {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => { closeMenu(); setStatusPickerSlug(null) }} />
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={closeMenu} />
       )}
       {statusPickerSlug && (() => {
         const book = textbooks.find((b) => b.slug === statusPickerSlug)
