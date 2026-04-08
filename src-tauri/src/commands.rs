@@ -673,9 +673,10 @@ pub fn get_all_progress(dir_path: String) -> Result<HashMap<String, BookProgress
 
 #[tauri::command]
 pub fn save_progress(dir_path: String, slug: String, progress: BookProgress) -> Result<(), String> {
-    let mut map: HashMap<String, BookProgress> = crate::json_storage::read_json(&dir_path, "progress.json");
-    map.insert(slug, progress);
-    crate::json_storage::write_json(&dir_path, "progress.json", &map)
+    crate::json_storage::update_json::<HashMap<String, BookProgress>, _>(&dir_path, "progress.json", |map| {
+        map.insert(slug, progress);
+        Ok(())
+    })
 }
 
 // ---------- task-004: starred commands ----------
@@ -713,9 +714,10 @@ pub fn set_book_status(dir_path: String, slug: String, status: String) -> Result
     if !VALID.contains(&status.as_str()) {
         return Err(format!("Invalid book status '{}'. Must be one of: {}", status, VALID.join(", ")));
     }
-    let mut map: HashMap<String, String> = crate::json_storage::read_json(&dir_path, "book-status.json");
-    map.insert(slug, status);
-    crate::json_storage::write_json(&dir_path, "book-status.json", &map)
+    crate::json_storage::update_json::<HashMap<String, String>, _>(&dir_path, "book-status.json", |map| {
+        map.insert(slug, status);
+        Ok(())
+    })
 }
 
 // ---------- task-006: xp commands ----------
@@ -728,11 +730,13 @@ pub fn get_xp(dir_path: String, slug: String) -> Result<i64, String> {
 
 #[tauri::command]
 pub fn increment_xp(dir_path: String, slug: String) -> Result<i64, String> {
-    let mut map: HashMap<String, i64> = crate::json_storage::read_json(&dir_path, "xp.json");
-    let entry = map.entry(slug).or_insert(0);
-    *entry += 1;
-    let new_value = *entry;
-    crate::json_storage::write_json(&dir_path, "xp.json", &map)?;
+    let mut new_value = 0i64;
+    crate::json_storage::update_json::<HashMap<String, i64>, _>(&dir_path, "xp.json", |map| {
+        let entry = map.entry(slug).or_insert(0);
+        *entry += 1;
+        new_value = *entry;
+        Ok(())
+    })?;
     Ok(new_value)
 }
 

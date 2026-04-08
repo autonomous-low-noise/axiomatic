@@ -24,6 +24,18 @@ pub fn write_json<T: Serialize>(dir_path: &str, filename: &str, data: &T) -> Res
     std::fs::write(&path, json).map_err(|e| format!("Failed to write {}: {}", path.display(), e))
 }
 
+/// Read-modify-write a JSON file atomically (read → apply closure → write back).
+/// Reduces the boilerplate of loading, mutating, and saving JSON in every command.
+pub fn update_json<T, F>(dir_path: &str, filename: &str, f: F) -> Result<(), String>
+where
+    T: DeserializeOwned + Default + Serialize,
+    F: FnOnce(&mut T) -> Result<(), String>,
+{
+    let mut data: T = read_json(dir_path, filename);
+    f(&mut data)?;
+    write_json(dir_path, filename, &data)
+}
+
 /// Read a JSON file, returning None if it doesn't exist.
 /// Unlike `read_json`, this doesn't require Default.
 pub fn read_json_opt<T: DeserializeOwned>(dir_path: &str, filename: &str) -> Option<T> {

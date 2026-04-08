@@ -1,4 +1,4 @@
-use crate::json_storage::{read_json, write_json};
+use crate::json_storage::{read_json, write_json, update_json};
 use crate::models::{Snip, SnipTagDef};
 
 const SNIPS_FILE: &str = "snips.json";
@@ -71,26 +71,22 @@ pub fn list_all_snips(dir_path: String) -> Result<Vec<Snip>, String> {
 
 #[tauri::command]
 pub fn add_snip_tag(dir_path: String, snip_id: String, tag: String) -> Result<(), String> {
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    let snip = all
-        .iter_mut()
-        .find(|s| s.id == snip_id)
-        .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
-    if !snip.tags.contains(&tag) {
-        snip.tags.push(tag);
-    }
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        let snip = all.iter_mut().find(|s| s.id == snip_id)
+            .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
+        if !snip.tags.contains(&tag) { snip.tags.push(tag); }
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn remove_snip_tag(dir_path: String, snip_id: String, tag: String) -> Result<(), String> {
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    let snip = all
-        .iter_mut()
-        .find(|s| s.id == snip_id)
-        .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
-    snip.tags.retain(|t| t != &tag);
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        let snip = all.iter_mut().find(|s| s.id == snip_id)
+            .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
+        snip.tags.retain(|t| t != &tag);
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -107,55 +103,54 @@ pub fn list_all_snip_tags(dir_path: String) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn rename_snip(dir_path: String, snip_id: String, new_label: String) -> Result<(), String> {
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    let snip = all
-        .iter_mut()
-        .find(|s| s.id == snip_id)
-        .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
-    snip.label = new_label;
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        let snip = all.iter_mut().find(|s| s.id == snip_id)
+            .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
+        snip.label = new_label;
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn bulk_add_snip_tag(dir_path: String, snip_ids: Vec<String>, tag: String) -> Result<(), String> {
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
-        if !snip.tags.contains(&tag) {
-            snip.tags.push(tag.clone());
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
+            if !snip.tags.contains(&tag) { snip.tags.push(tag.clone()); }
         }
-    }
-    write_json(&dir_path, SNIPS_FILE, &all)
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn bulk_remove_snip_tag(dir_path: String, snip_ids: Vec<String>, tag: String) -> Result<(), String> {
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
-        snip.tags.retain(|t| t != &tag);
-    }
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
+            snip.tags.retain(|t| t != &tag);
+        }
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn set_snip_status(dir_path: String, snip_id: String, status: String) -> Result<(), String> {
     validate_snip_status(&status)?;
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    let snip = all
-        .iter_mut()
-        .find(|s| s.id == snip_id)
-        .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
-    snip.status = status;
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        let snip = all.iter_mut().find(|s| s.id == snip_id)
+            .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
+        snip.status = status;
+        Ok(())
+    })
 }
 
 #[tauri::command]
 pub fn bulk_set_snip_status(dir_path: String, snip_ids: Vec<String>, status: String) -> Result<(), String> {
     validate_snip_status(&status)?;
-    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
-    for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
-        snip.status = status.clone();
-    }
-    write_json(&dir_path, SNIPS_FILE, &all)
+    update_json::<Vec<Snip>, _>(&dir_path, SNIPS_FILE, |all| {
+        for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
+            snip.status = status.clone();
+        }
+        Ok(())
+    })
 }
 
 #[tauri::command]
