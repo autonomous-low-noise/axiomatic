@@ -25,7 +25,7 @@ interface ContextMenuState {
 
 const FILTER_STORAGE_KEY = 'axiomatic:snips-filter'
 
-type SortKey = 'created_at' | 'label' | 'source' | 'page'
+type SortKey = 'created_at' | 'label' | 'source' | 'page' | 'status'
 type SortDir = 'asc' | 'desc'
 interface SortColumn { key: SortKey; dir: SortDir }
 
@@ -83,7 +83,7 @@ export function SnipsPage() {
   const { textbooks, loading: booksLoading } = useTextbooks()
   const {
     snips, loading: snipsLoading, addTag, removeTag,
-    renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag, refresh: refreshSnips,
+    renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag, setSnipStatus, bulkSetSnipStatus, refresh: refreshSnips,
   } = useAllSnips(directories)
 
   const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
@@ -203,6 +203,7 @@ export function SnipsPage() {
           case 'label': cmp = a.label.localeCompare(b.label); break
           case 'source': cmp = (slugToTitle[a.slug] ?? a.slug).localeCompare(slugToTitle[b.slug] ?? b.slug); break
           case 'page': cmp = a.page - b.page; break
+          case 'status': cmp = a.status.localeCompare(b.status); break
           default: cmp = a.created_at.localeCompare(b.created_at); break
         }
         if (cmp !== 0) return cmp * m
@@ -668,12 +669,12 @@ export function SnipsPage() {
                     />
                   </th>
                 )}
-                {(['label', 'source', 'page', 'created_at'] as SortKey[]).map((key) => {
+                {(['label', 'source', 'page'] as SortKey[]).map((key) => {
                   const idx = sortColumns.findIndex((c) => c.key === key)
                   const col = idx >= 0 ? sortColumns[idx] : null
                   const arrow = col ? (col.dir === 'asc' ? '▲' : '▼') : ''
                   const rank = col && sortColumns.length > 1 ? `${idx + 1}` : ''
-                  const label = key === 'created_at' ? 'Created' : key === 'page' ? 'Page' : key.charAt(0).toUpperCase() + key.slice(1)
+                  const label = key === 'page' ? 'Page' : key.charAt(0).toUpperCase() + key.slice(1)
                   return (
                     <th
                       key={key}
@@ -686,6 +687,23 @@ export function SnipsPage() {
                   )
                 })}
                 <th className="px-4 py-2">Tags</th>
+                {(['status', 'created_at'] as SortKey[]).map((key) => {
+                  const idx = sortColumns.findIndex((c) => c.key === key)
+                  const col = idx >= 0 ? sortColumns[idx] : null
+                  const arrow = col ? (col.dir === 'asc' ? '▲' : '▼') : ''
+                  const rank = col && sortColumns.length > 1 ? `${idx + 1}` : ''
+                  const label = key === 'created_at' ? 'Created' : 'Status'
+                  return (
+                    <th
+                      key={key}
+                      className="cursor-pointer px-4 py-2 select-none"
+                      onClick={(e) => toggleSort(key, e.shiftKey)}
+                    >
+                      {label}
+                      {arrow && <span className="ml-1 text-[10px]">{arrow}{rank}</span>}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -776,13 +794,31 @@ export function SnipsPage() {
                         <span className="text-[#93a1a1]/50 dark:text-[#586e75]/50">--</span>
                       )}
                     </td>
+                    <td className="px-4 py-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const next = snip.status === 'open' ? 'solid' : snip.status === 'solid' ? 'attention' : 'open'
+                          setSnipStatus(snip.dirPath, snip.id, next)
+                        }}
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          snip.status === 'solid'
+                            ? 'bg-[#859900]/20 text-[#859900]'
+                            : snip.status === 'attention'
+                              ? 'bg-[#cb4b16]/20 text-[#cb4b16]'
+                              : 'bg-[#93a1a1]/20 text-[#93a1a1]'
+                        }`}
+                      >
+                        {snip.status}
+                      </button>
+                    </td>
                     <td className="px-4 py-2 tabular-nums text-[#93a1a1] dark:text-[#586e75]">
                       {snip.created_at.slice(0, 10)}
                     </td>
                   </tr>
                   {expandedIds.has(snip.id) && (
                     <tr className="border-b border-[#eee8d5] bg-[#eee8d5]/30 dark:border-[#073642] dark:bg-[#073642]/30">
-                      <td colSpan={selectMode ? 6 : 5} className="px-4 py-4">
+                      <td colSpan={selectMode ? 8 : 7} className="px-4 py-4">
                         <div className="flex gap-6">
                           <ZoomableSnipImage snip={snip} maxHeight="200px" pathMap={pathMap} dirPath={snip.dirPath} />
                           <div className="flex flex-col gap-2 text-sm text-[#586e75] dark:text-[#93a1a1]">
@@ -898,6 +934,19 @@ export function SnipsPage() {
               await addTag(contextMenu.snip.dirPath, contextMenu.snip.id, name)
             }
           }}
+          onSetStatus={async (status) => {
+            if (selectedIds.has(contextMenu.snip.id) && selectedIds.size > 1) {
+              const byDir = new Map<string, string[]>()
+              for (const s of selectedSnips) {
+                const ids = byDir.get(s.dirPath) ?? []
+                ids.push(s.id)
+                byDir.set(s.dirPath, ids)
+              }
+              for (const [dirPath, ids] of byDir) await bulkSetSnipStatus(dirPath, ids, status)
+            } else {
+              await setSnipStatus(contextMenu.snip.dirPath, contextMenu.snip.id, status)
+            }
+          }}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -931,6 +980,8 @@ export function SnipsPage() {
         <span className="text-[10px] text-[#93a1a1] dark:text-[#586e75]">
           {filteredSnips.length} snip{filteredSnips.length !== 1 ? 's' : ''}
           {filteredSnips.length !== snips.length && ` of ${snips.length} total`}
+          {' '}({filteredSnips.filter((s) => s.status === 'solid').length} solid
+          {filteredSnips.some((s) => s.status === 'attention') && `, ${filteredSnips.filter((s) => s.status === 'attention').length} attention`})
         </span>
       </div>
 
@@ -1004,7 +1055,7 @@ export function SnipsPage() {
 // Extracted context menu with tag checkboxes, rename, delete
 function ContextMenu({
   x, y, snip, tagDefs, bulkSnips,
-  onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onCreateTag, onClose,
+  onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onCreateTag, onSetStatus, onClose,
 }: {
   x: number
   y: number
@@ -1019,6 +1070,7 @@ function ContextMenu({
   onAddTag: (tag: string) => void
   onRemoveTag: (tag: string) => void
   onCreateTag: (name: string) => void
+  onSetStatus: (status: 'open' | 'solid' | 'attention') => void
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -1129,6 +1181,26 @@ function ContextMenu({
             className="h-6 w-full rounded border border-[#93a1a1]/30 bg-transparent px-2 text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
           />
         </div>
+      </div>
+
+      <div className="border-t border-[#eee8d5] py-1 dark:border-[#073642]">
+        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#93a1a1] dark:text-[#657b83]">
+          {bulkSnips ? `Status (${bulkSnips.length})` : 'Status'}
+        </p>
+        {(['open', 'solid', 'attention'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => { onSetStatus(s); onClose() }}
+            className="flex w-full items-center gap-2 px-3 py-1 text-left text-sm hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
+          >
+            <span className={`h-2 w-2 rounded-full ${
+              s === 'solid' ? 'bg-[#859900]' : s === 'attention' ? 'bg-[#cb4b16]' : 'bg-[#93a1a1]'
+            }`} />
+            <span className={`${snip.status === s ? 'font-medium text-[#073642] dark:text-[#eee8d5]' : 'text-[#586e75] dark:text-[#93a1a1]'}`}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </span>
+          </button>
+        ))}
       </div>
     </div>,
     document.body,

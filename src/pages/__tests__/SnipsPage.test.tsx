@@ -21,6 +21,8 @@ const stubAllSnips = {
   deleteSnip: vi.fn(),
   bulkAddTag: vi.fn(),
   bulkRemoveTag: vi.fn(),
+  setSnipStatus: vi.fn(),
+  bulkSetSnipStatus: vi.fn(),
   refresh: vi.fn(),
 }
 
@@ -729,6 +731,65 @@ describe('SnipsPage', () => {
     expect(screen.getByText('In B1')).toBeInTheDocument()
     expect(screen.queryByText('In B2')).not.toBeInTheDocument()
     expect(screen.queryByText('None')).not.toBeInTheDocument()
+  })
+
+  it('status column renders with correct badge for each status', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Open snip', status: 'open', created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Solid snip', status: 'solid', created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'Attn snip', status: 'attention', created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const buttons = screen.getAllByRole('button').filter((b) => ['open', 'solid', 'attention'].includes(b.textContent ?? ''))
+    expect(buttons).toHaveLength(3)
+  })
+
+  it('clicking status badge cycles through open → solid → attention', () => {
+    stubAllSnips.setSnipStatus.mockResolvedValue(undefined)
+    renderPage([makeSnip({ id: 's1', label: 'Test', status: 'open' })])
+
+    const openBadge = screen.getAllByRole('button').find((b) => b.textContent === 'open')!
+    fireEvent.click(openBadge)
+
+    expect(stubAllSnips.setSnipStatus).toHaveBeenCalledWith('/lib', 's1', 'solid')
+  })
+
+  it('context menu shows Status section with three options', () => {
+    renderPage()
+    const row = screen.getByText('Definition 1.1').closest('tr')!
+    fireEvent.contextMenu(row)
+
+    expect(screen.getByText('Open')).toBeInTheDocument()
+    expect(screen.getByText('Solid')).toBeInTheDocument()
+    expect(screen.getByText('Attention')).toBeInTheDocument()
+  })
+
+  it('footer shows solid count', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'A', status: 'solid', created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'B', status: 'open', created_at: '2024-06-02T00:00:00Z' }),
+    ]
+    renderPage(snips)
+    expect(screen.getByText(/1 solid/)).toBeInTheDocument()
+  })
+
+  it('sorting by status column works', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Solid one', status: 'solid', created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Attn one', status: 'attention', created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'Open one', status: 'open', created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const statusHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Status'))!
+    fireEvent.click(statusHeader)
+
+    const rows = screen.getAllByRole('row').slice(1)
+    // asc: attention < open < solid
+    expect(rows[0]).toHaveTextContent('Attn one')
+    expect(rows[1]).toHaveTextContent('Open one')
+    expect(rows[2]).toHaveTextContent('Solid one')
   })
 
   it('context menu is scrollable with max-height', () => {
