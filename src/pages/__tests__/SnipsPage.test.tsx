@@ -620,6 +620,116 @@ describe('SnipsPage', () => {
     expect(rows[2]).toHaveTextContent('C') // topology p1
   })
 
+  it('clicking Label header sorts alphabetically', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Zebra', slug: 'algebra', created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Apple', slug: 'algebra', created_at: '2024-06-02T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const labelHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Label'))!
+    fireEvent.click(labelHeader)
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Apple')
+    expect(rows[1]).toHaveTextContent('Zebra')
+
+    fireEvent.click(labelHeader)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Zebra')
+    expect(rows[1]).toHaveTextContent('Apple')
+  })
+
+  it('clicking Created header sorts by date', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Old', slug: 'algebra', created_at: '2024-01-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'New', slug: 'algebra', created_at: '2024-12-01T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Default is created_at asc → Old first
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Old')
+
+    // Click Created → already active, toggles to desc
+    const createdHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Created'))!
+    fireEvent.click(createdHeader)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('New')
+  })
+
+  it('shift+click toggles direction of existing secondary column', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'A', slug: 'algebra', page: 10, created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'B', slug: 'algebra', page: 2,  created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'C', slug: 'topology', page: 1, created_at: '2024-06-01T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const sourceHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Source'))!
+    const pageHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Page'))!
+
+    // Source asc, then shift+page asc
+    fireEvent.click(sourceHeader)
+    fireEvent.click(pageHeader, { shiftKey: true })
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('B') // algebra p2
+    expect(rows[1]).toHaveTextContent('A') // algebra p10
+
+    // Shift+page again → toggles page to desc
+    fireEvent.click(pageHeader, { shiftKey: true })
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('A') // algebra p10 (desc)
+    expect(rows[1]).toHaveTextContent('B') // algebra p2
+  })
+
+  it('plain click after multi-column resets to single column', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'A', slug: 'algebra', page: 10, created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'B', slug: 'algebra', page: 2,  created_at: '2024-06-02T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    const sourceHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Source'))!
+    const pageHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Page'))!
+
+    // Set up multi-column: source + page
+    fireEvent.click(sourceHeader)
+    fireEvent.click(pageHeader, { shiftKey: true })
+
+    // Plain click on Label → resets to single-column sort by label
+    const labelHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Label'))!
+    fireEvent.click(labelHeader)
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('A')
+    expect(rows[1]).toHaveTextContent('B')
+  })
+
+  it('sort state persists to localStorage', () => {
+    renderPage()
+    const sourceHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Source'))!
+    fireEvent.click(sourceHeader)
+
+    const stored = JSON.parse(localStorage.getItem('axiomatic:snips-filter') ?? '{}')
+    expect(stored.sortColumns).toEqual([{ key: 'source', dir: 'asc' }])
+  })
+
+  it('batch-only filter without regular tags shows all snips matching any batch', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'In B1', tags: ['Batch 1'], created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'In B2', tags: ['Batch 2'], created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'None',  tags: ['algebra'], created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    fireEvent.click(screen.getByText('All tags'))
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 1'))
+
+    expect(screen.getByText('In B1')).toBeInTheDocument()
+    expect(screen.queryByText('In B2')).not.toBeInTheDocument()
+    expect(screen.queryByText('None')).not.toBeInTheDocument()
+  })
+
   it('context menu is scrollable with max-height', () => {
     stubTagDefs.defs = Array.from({ length: 20 }, (_, i) => ({ name: `tag-${i}`, color: '#268bd2' }))
     renderPage()
