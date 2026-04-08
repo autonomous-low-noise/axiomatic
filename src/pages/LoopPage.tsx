@@ -100,6 +100,7 @@ export function LoopPage() {
         pathMap={pathMap}
         dirPath={book?.dir_path}
         onRename={renameSnip}
+        onNavigateToSnip={(snip) => navigate(`/read/${snip.slug}?page=${snip.page}`)}
       />
     </div>
   )

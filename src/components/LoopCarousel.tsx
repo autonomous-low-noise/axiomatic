@@ -29,6 +29,8 @@ interface LoopCarouselProps {
   dirPath?: string
   /** Rename callback — receives dirPath, snip id, new label */
   onRename?: (dirPath: string, snipId: string, newLabel: string) => Promise<void>
+  /** Navigate to snip's page in the reader */
+  onNavigateToSnip?: (snip: Snip) => void
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -53,6 +55,7 @@ export function LoopCarousel({
   pathMap,
   dirPath,
   onRename,
+  onNavigateToSnip,
 }: LoopCarouselProps) {
   const [notesOpen, setNotesOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -212,6 +215,12 @@ export function LoopCarousel({
           e.preventDefault()
           startRename()
           break
+        case 'o':
+          if (onNavigateToSnip && orderedSnips[index]) {
+            e.preventDefault()
+            onNavigateToSnip(orderedSnips[index])
+          }
+          break
         case 'Escape':
           e.preventDefault()
           onExit()
@@ -220,7 +229,7 @@ export function LoopCarousel({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleNext, handlePrev, onExit, startRename])
+  }, [handleNext, handlePrev, onExit, startRename, onNavigateToSnip, orderedSnips, index])
 
   if (!current) {
     return (
@@ -243,15 +252,13 @@ export function LoopCarousel({
               <button
                 onClick={handleToggleShuffle}
                 aria-label="Toggle shuffle"
-                title={isShuffled ? 'Shuffled — click to sort' : 'Sorted — click to shuffle'}
-                className={`transition-colors ${isShuffled ? 'text-[#268bd2]' : 'text-[#93a1a1] dark:text-[#586e75]'} hover:text-[#268bd2]`}
+                className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  isShuffled
+                    ? 'border-[#268bd2]/50 bg-[#268bd2]/10 text-[#268bd2]'
+                    : 'border-[#93a1a1]/30 text-[#93a1a1] hover:border-[#268bd2]/50 hover:text-[#268bd2] dark:text-[#586e75]'
+                }`}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="16 3 21 3 21 8" />
-                  <line x1="4" y1="20" x2="21" y2="3" />
-                  <polyline points="21 16 21 21 16 21" />
-                  <line x1="15" y1="15" x2="21" y2="21" />
-                </svg>
+                {isShuffled ? 'Shuffled' : 'Sorted'}
               </button>
             )}
             {!viewMode && !noXp && !onIncrementXpForSnip && (

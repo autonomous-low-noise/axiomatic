@@ -1,11 +1,11 @@
-- refresh overview for new docs
+- [DONE] refresh overview for new docs
 - [DONE] page counter buggy
 - [DONE] untag does not remove selection
 - [DONE] partial selector should first deselect
 - [DONE] snip table should show item count
-- jump from snip to pdf page
+- [DONE] jump from snip to pdf page
 - [DONE] subsequent batch tags should be OR-ed (exception for tags starting with Batch; or handle it in better way)
-- shuffle button bad UX
+- [DONE] shuffle button bad UX
 - [DONE] snip table state should persist across app restarts
 - sharper thumbnails in overview page
 - [DONE] critical bug: shorter pages than A4 are stretched to fill it

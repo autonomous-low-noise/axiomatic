@@ -961,6 +961,7 @@ export function SnipsPage() {
             noXp={true}
             pathMap={pathMap}
             onRename={renameSnip}
+            onNavigateToSnip={navigateToSnip}
           />
         </div>
       )}
@@ -992,6 +993,7 @@ export function SnipsPage() {
             initialIndex={viewStartIndex}
             pathMap={pathMap}
             onRename={renameSnip}
+            onNavigateToSnip={navigateToSnip}
           />
         </div>
       )}

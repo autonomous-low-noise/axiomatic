@@ -345,6 +345,16 @@ export function OverviewPage() {
               </svg>
             </button>
           </div>
+          <button
+            onClick={refresh}
+            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            aria-label="Refresh library"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          </button>
           {tags.length > 0 && (
             <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
               {tags.map((tag) => {

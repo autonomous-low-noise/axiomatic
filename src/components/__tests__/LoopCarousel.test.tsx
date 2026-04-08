@@ -704,7 +704,7 @@ describe('LoopCarousel', () => {
     expect(onIncrementXp).toHaveBeenCalledTimes(1)
   })
 
-  it('shuffle toggle button visible in normal mode', async () => {
+  it('shuffle toggle button shows "Sorted" label in normal mode', async () => {
     const snips = [makeSnip()]
     render(
       <LoopCarousel
@@ -718,7 +718,9 @@ describe('LoopCarousel', () => {
     await waitFor(() => {
       expect(screen.getByText('Definition 1.1')).toBeInTheDocument()
     })
-    expect(screen.getByLabelText('Toggle shuffle')).toBeInTheDocument()
+    const btn = screen.getByLabelText('Toggle shuffle')
+    expect(btn).toBeInTheDocument()
+    expect(btn).toHaveTextContent('Sorted')
   })
 
   it('shuffle toggle button not visible in viewMode', async () => {
@@ -870,5 +872,42 @@ describe('LoopCarousel', () => {
 
     fireEvent.doubleClick(screen.getByText('Click Me'))
     expect(screen.getByDisplayValue('Click Me')).toBeInTheDocument()
+  })
+
+  it('o key calls onNavigateToSnip with current snip', async () => {
+    const onNav = vi.fn()
+    const snips = [makeSnip({ id: 's1', slug: 'algebra', page: 5, label: 'Nav Me' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} onNavigateToSnip={onNav} />,
+    )
+    await waitFor(() => expect(screen.getByText('Nav Me')).toBeInTheDocument())
+
+    fireEvent.keyDown(window, { key: 'o' })
+    expect(onNav).toHaveBeenCalledWith(expect.objectContaining({ id: 's1', slug: 'algebra', page: 5 }))
+  })
+
+  it('o key does nothing when onNavigateToSnip is not provided', async () => {
+    const onExit = vi.fn()
+    const snips = [makeSnip({ label: 'No nav' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={onExit} shuffled={false} />,
+    )
+    await waitFor(() => expect(screen.getByText('No nav')).toBeInTheDocument())
+
+    fireEvent.keyDown(window, { key: 'o' })
+    expect(onExit).not.toHaveBeenCalled() // no crash, no side effects
+  })
+
+  it('shuffle toggle shows "Shuffled" after clicking', async () => {
+    const snips = [makeSnip({ id: 's1', label: 'A' }), makeSnip({ id: 's2', label: 'B' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} />,
+    )
+    await waitFor(() => expect(screen.getByLabelText('Toggle shuffle')).toBeInTheDocument())
+
+    const btn = screen.getByLabelText('Toggle shuffle')
+    expect(btn).toHaveTextContent('Sorted')
+    fireEvent.click(btn)
+    expect(btn).toHaveTextContent('Shuffled')
   })
 })
