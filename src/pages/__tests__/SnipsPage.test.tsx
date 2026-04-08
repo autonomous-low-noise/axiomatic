@@ -113,6 +113,7 @@ function makeSnip(overrides: Partial<SnipWithDir> = {}): SnipWithDir {
     height: 0.3,
     created_at: '2024-06-15T10:00:00Z',
     tags: [],
+    status: 'open',
     dirPath: '/lib',
     dirLabel: 'Library',
     ...overrides,

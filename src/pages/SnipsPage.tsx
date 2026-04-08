@@ -240,7 +240,7 @@ export function SnipsPage() {
   }, [snips])
 
   const navigateToSnip = useCallback(
-    (snip: SnipWithDir) => navigate(`/read/${snip.slug}?page=${snip.page}`),
+    (snip: { slug: string; page: number }) => navigate(`/read/${snip.slug}?page=${snip.page}`),
     [navigate],
   )
 

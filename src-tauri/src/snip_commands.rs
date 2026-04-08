@@ -36,6 +36,7 @@ pub fn create_snip(
         height,
         created_at: now,
         tags: Vec::new(),
+        status: "open".into(),
     };
     all.push(snip.clone());
     write_json(&dir_path, SNIPS_FILE, &all)?;
@@ -124,6 +125,38 @@ pub fn bulk_remove_snip_tag(dir_path: String, snip_ids: Vec<String>, tag: String
         snip.tags.retain(|t| t != &tag);
     }
     write_json(&dir_path, SNIPS_FILE, &all)
+}
+
+#[tauri::command]
+pub fn set_snip_status(dir_path: String, snip_id: String, status: String) -> Result<(), String> {
+    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
+    let snip = all
+        .iter_mut()
+        .find(|s| s.id == snip_id)
+        .ok_or_else(|| format!("Snip not found: {}", snip_id))?;
+    snip.status = status;
+    write_json(&dir_path, SNIPS_FILE, &all)
+}
+
+#[tauri::command]
+pub fn bulk_set_snip_status(dir_path: String, snip_ids: Vec<String>, status: String) -> Result<(), String> {
+    let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
+    for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
+        snip.status = status.clone();
+    }
+    write_json(&dir_path, SNIPS_FILE, &all)
+}
+
+#[tauri::command]
+pub fn get_snip_status_counts(dir_path: String) -> Result<std::collections::HashMap<String, (i64, i64)>, String> {
+    let all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
+    let mut counts: std::collections::HashMap<String, (i64, i64)> = std::collections::HashMap::new();
+    for snip in &all {
+        let entry = counts.entry(snip.slug.clone()).or_insert((0, 0));
+        entry.0 += 1;
+        if snip.status == "solid" { entry.1 += 1; }
+    }
+    Ok(counts)
 }
 
 #[tauri::command]

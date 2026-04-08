@@ -72,6 +72,12 @@ pub struct Snip {
     pub created_at: String,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default = "default_snip_status")]
+    pub status: String,
+}
+
+fn default_snip_status() -> String {
+    "open".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

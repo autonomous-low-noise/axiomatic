@@ -13,9 +13,10 @@ vi.mock('../../hooks/useTextbooks', () => ({
 
 vi.mock('../../hooks/useSnips', () => ({
   useSnips: () => ({
-    snips: [{ id: 's1', slug: 'algebra', full_path: '/lib/algebra.pdf', page: 1, label: 'Def 1', x: 0, y: 0, width: 0.5, height: 0.5, created_at: '2024-01-01', tags: [] }],
+    snips: [{ id: 's1', slug: 'algebra', full_path: '/lib/algebra.pdf', page: 1, label: 'Def 1', x: 0, y: 0, width: 0.5, height: 0.5, created_at: '2024-01-01', tags: [], status: 'open' }],
     xp: 0,
     incrementXp: vi.fn().mockResolvedValue(1),
+    renameSnip: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 

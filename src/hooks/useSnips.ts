@@ -14,6 +14,7 @@ export interface Snip {
   height: number
   created_at: string
   tags: string[]
+  status: 'open' | 'solid' | 'attention'
 }
 
 export function useSnips(slug: string | undefined, dirPath: string | undefined) {
@@ -88,7 +89,14 @@ export function useSnips(slug: string | undefined, dirPath: string | undefined) 
     }
   }, [slug, dirPath, xp])
 
-  return { snips, xp, addSnip, removeSnip, incrementXp }
+  const renameSnip = useCallback(async (dp: string, snipId: string, newLabel: string) => {
+    await invoke('rename_snip', { dirPath: dp, snipId, newLabel })
+    setSnips((prev) =>
+      prev.map((s) => (s.id === snipId ? { ...s, label: newLabel } : s)),
+    )
+  }, [])
+
+  return { snips, xp, addSnip, removeSnip, incrementXp, renameSnip }
 }
 
 /** Snip enriched with its source directory path for IPC calls. */
@@ -181,5 +189,20 @@ export function useAllSnips(directories: Directory[]) {
     )
   }, [])
 
-  return { snips, loading, refresh, addTag, removeTag, renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag }
+  const setSnipStatus = useCallback(async (dirPath: string, snipId: string, status: Snip['status']) => {
+    await invoke('set_snip_status', { dirPath, snipId, status })
+    setSnips((prev) =>
+      prev.map((s) => (s.id === snipId ? { ...s, status } : s)),
+    )
+  }, [])
+
+  const bulkSetSnipStatus = useCallback(async (dirPath: string, snipIds: string[], status: Snip['status']) => {
+    await invoke('bulk_set_snip_status', { dirPath, snipIds, status })
+    const idSet = new Set(snipIds)
+    setSnips((prev) =>
+      prev.map((s) => (idSet.has(s.id) ? { ...s, status } : s)),
+    )
+  }, [])
+
+  return { snips, loading, refresh, addTag, removeTag, renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag, setSnipStatus, bulkSetSnipStatus }
 }

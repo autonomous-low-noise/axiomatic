@@ -700,6 +700,20 @@ pub fn toggle_starred(dir_path: String, slug: String) -> Result<bool, String> {
     Ok(new_state)
 }
 
+// ---------- book status commands ----------
+
+#[tauri::command]
+pub fn get_all_book_status(dir_path: String) -> Result<HashMap<String, String>, String> {
+    Ok(crate::json_storage::read_json(&dir_path, "book-status.json"))
+}
+
+#[tauri::command]
+pub fn set_book_status(dir_path: String, slug: String, status: String) -> Result<(), String> {
+    let mut map: HashMap<String, String> = crate::json_storage::read_json(&dir_path, "book-status.json");
+    map.insert(slug, status);
+    crate::json_storage::write_json(&dir_path, "book-status.json", &map)
+}
+
 // ---------- task-006: xp commands ----------
 
 #[tauri::command]

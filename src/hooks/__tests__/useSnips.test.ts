@@ -19,6 +19,7 @@ const sampleSnip: Snip = {
   height: 0.3,
   created_at: '2024-01-01T00:00:00Z',
   tags: [],
+  status: 'open',
 }
 
 beforeEach(() => {
