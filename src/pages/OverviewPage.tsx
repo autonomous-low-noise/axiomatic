@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { useTextbooks } from '../hooks/useTextbooks'
 import { useDirectories } from '../hooks/useDirectories'
+import { useDirPaths } from '../hooks/useDirPaths'
 import { useProgress } from '../hooks/useProgress'
 import { useStarred } from '../hooks/useStarred'
 import { useTags } from '../hooks/useTags'
@@ -32,7 +33,7 @@ interface MenuState {
 export function OverviewPage() {
   const { textbooks, loading, refresh } = useTextbooks()
   const { directories, add: addDir, remove: removeDir, error: dirError } = useDirectories()
-  const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
+  const dirPaths = useDirPaths(directories)
   const { progress } = useProgress(dirPaths)
   const { starred, toggle } = useStarred(textbooks)
   const { getStatus, setStatus: setBookStatus } = useBookStatus(dirPaths, progress)

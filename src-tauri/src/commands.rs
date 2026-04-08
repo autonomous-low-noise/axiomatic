@@ -709,6 +709,10 @@ pub fn get_all_book_status(dir_path: String) -> Result<HashMap<String, String>, 
 
 #[tauri::command]
 pub fn set_book_status(dir_path: String, slug: String, status: String) -> Result<(), String> {
+    const VALID: &[&str] = &["open", "in-progress", "need-revisit", "done"];
+    if !VALID.contains(&status.as_str()) {
+        return Err(format!("Invalid book status '{}'. Must be one of: {}", status, VALID.join(", ")));
+    }
     let mut map: HashMap<String, String> = crate::json_storage::read_json(&dir_path, "book-status.json");
     map.insert(slug, status);
     crate::json_storage::write_json(&dir_path, "book-status.json", &map)

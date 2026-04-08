@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import type { EditorView } from '@codemirror/view'
 import { useDirectories } from '../hooks/useDirectories'
+import { useDirPaths } from '../hooks/useDirPaths'
 import { useTextbooks } from '../hooks/useTextbooks'
 import { useAllSnips } from '../hooks/useSnips'
 import type { SnipWithDir } from '../hooks/useSnips'
@@ -86,7 +87,7 @@ export function SnipsPage() {
     renameSnip, deleteSnip, bulkAddTag, bulkRemoveTag, setSnipStatus, bulkSetSnipStatus, refresh: refreshSnips,
   } = useAllSnips(directories)
 
-  const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
+  const dirPaths = useDirPaths(directories)
 
   // Build slug → full_path and dir:file → full_path map for snip path resolution
   const pathMap = useMemo(() => {

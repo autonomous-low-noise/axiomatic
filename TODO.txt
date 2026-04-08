@@ -18,10 +18,7 @@
 - [DONE] no "close to the left/right" for tabs
 - not tab reorder
 - [DONE] no tab ctrl+pgup/down between tab nav
-- consolidate after mobile version
-	- tests. lot's of tests
-	- refactor: strategy pattern?
-	- consolidation iteration
+- [DISCARDED] consolidate after mobile version
 - [DONE] snip table view should also sort based on source
 - [DONE] no "mark pdf as marked" and "mark snip as solid" and no UI for
 	- [DONE] progress bar how many pdfs are marked per dir

@@ -136,8 +136,22 @@ export function useAllSnips(directories: Directory[]) {
       setLoading(false)
       return
     }
-    refresh()
-  }, [directories, refresh])
+    let cancelled = false
+    setLoading(true)
+    Promise.all(
+      directories.map(async (dir) => {
+        const dirSnips = await invoke<Snip[]>('list_all_snips', { dirPath: dir.path })
+        return dirSnips.map((s) => ({ ...s, dirPath: dir.path, dirLabel: dir.label }))
+      }),
+    ).then((results) => {
+      if (!cancelled) setSnips(results.flat())
+    }).catch((err) => {
+      if (!cancelled) console.error('useAllSnips failed:', err)
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [directories])
 
   const addTag = useCallback(async (dirPath: string, snipId: string, tag: string) => {
     await invoke('add_snip_tag', { dirPath, snipId, tag })

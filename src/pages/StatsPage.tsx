@@ -1,12 +1,12 @@
-import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useDirectories } from '../hooks/useDirectories'
+import { useDirPaths } from '../hooks/useDirPaths'
 import { togglePalette } from '../lib/palette'
 import { StudyStats } from '../components/StudyStats'
 
 export function StatsPage() {
   const { directories } = useDirectories()
-  const dirPaths = useMemo(() => directories.map((d) => d.path), [directories])
+  const dirPaths = useDirPaths(directories)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">

@@ -3,6 +3,15 @@ use crate::models::{Snip, SnipTagDef};
 
 const SNIPS_FILE: &str = "snips.json";
 const SNIP_TAG_DEFS_FILE: &str = "snip-tag-defs.json";
+const VALID_SNIP_STATUSES: &[&str] = &["open", "solid", "attention"];
+
+fn validate_snip_status(status: &str) -> Result<(), String> {
+    if VALID_SNIP_STATUSES.contains(&status) {
+        Ok(())
+    } else {
+        Err(format!("Invalid snip status '{}'. Must be one of: {}", status, VALID_SNIP_STATUSES.join(", ")))
+    }
+}
 
 #[tauri::command]
 pub fn list_snips(dir_path: String, slug: String) -> Result<Vec<Snip>, String> {
@@ -129,6 +138,7 @@ pub fn bulk_remove_snip_tag(dir_path: String, snip_ids: Vec<String>, tag: String
 
 #[tauri::command]
 pub fn set_snip_status(dir_path: String, snip_id: String, status: String) -> Result<(), String> {
+    validate_snip_status(&status)?;
     let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
     let snip = all
         .iter_mut()
@@ -140,6 +150,7 @@ pub fn set_snip_status(dir_path: String, snip_id: String, status: String) -> Res
 
 #[tauri::command]
 pub fn bulk_set_snip_status(dir_path: String, snip_ids: Vec<String>, status: String) -> Result<(), String> {
+    validate_snip_status(&status)?;
     let mut all: Vec<Snip> = read_json(&dir_path, SNIPS_FILE);
     for snip in all.iter_mut().filter(|s| snip_ids.contains(&s.id)) {
         snip.status = status.clone();
