@@ -42,8 +42,12 @@ src/hooks/useTheme.ts           — theme store with setTheme() export for direc
 src/hooks/useSnips.ts           — snip CRUD + XP tracking (IPC → .axiomatic/ JSON)
 src/hooks/usePomodoroTimer.ts   — pomodoro session state + timer logic
 src/hooks/useSnipTagDefs.ts     — snip tag definitions CRUD
+src/hooks/useBookStatus.ts      — book status (open/in-progress/need-revisit/done) per slug
+src/hooks/useDirPaths.ts        — extract dir paths from directories (shared across pages)
+src/hooks/usePathMap.ts         — slug → full_path map for cross-device snip resolution
 src/hooks/useSwipe.ts           — touch swipe gesture detection (left/right/tap)
 src/hooks/usePinchZoom.ts       — two-finger pinch zoom gesture handling
+src/lib/storageKeys.ts          — centralized localStorage key constants
 src/extensions/                 — CodeMirror 6 plugins (editor-theme, image-paste, math-decoration)
 src-tauri/src/commands.rs        — general Tauri IPC commands (db, files, tags, project state)
 src-tauri/src/highlight_commands.rs — highlight CRUD IPC commands
@@ -81,6 +85,8 @@ Routes: `/` OverviewPage, `/read/:slug` ReaderPage, `/loop/:slug` LoopPage, `/sn
 | Highlights | SQLite | `useHighlights` hook, bookmarks stored as `color="bookmark"` |
 | Snip tags | `.axiomatic/snip_tag_defs.json` | IPC `create_snip_tag_def`/`list_snip_tag_defs`, per-snip tag arrays |
 | Pomodoro sessions | `.axiomatic/sessions.json` | IPC `log_session`/`list_sessions`, per-slug session history |
+| Book status | `.axiomatic/book-status.json` | IPC `get_all_book_status`/`set_book_status`, `useBookStatus` hook |
+| Snip status | `.axiomatic/snips.json` (status field) | `set_snip_status`/`bulk_set_snip_status`, defaults to "open" |
 | Tabs | localStorage | `useTabs` hook with reopen stack + `useTabNavigation` for route-aware nav |
 
 `createLocalStorageStore` (lib/createStore.ts) is a generic factory for remaining localStorage state (theme, tabs): `load()` returns parsed snapshot, `emitChange()` re-reads from localStorage and notifies subscribers.
@@ -160,9 +166,9 @@ npm run vite:dev     # vite only (no tauri)
 npm run vite:build   # tsc -b + vite build (no tauri)
 npx tsc -b           # type-check (same as build uses)
 npm run lint         # eslint
-npm run test         # vitest unit tests (399 tests)
+npm run test         # vitest unit tests (502 tests)
 npm run test:e2e     # playwright E2E tests (requires vite dev server)
-cargo test --lib     # rust unit tests (73 tests, from src-tauri/)
+cargo test --lib     # rust unit tests (91 tests, from src-tauri/)
 
 # Run a single vitest file
 npx vitest run src/hooks/__tests__/useVimReader.test.ts

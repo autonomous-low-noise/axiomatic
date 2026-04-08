@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { BookStatus, BookStatusMap, ProgressMap } from '../types/progress'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function useBookStatus(dirPaths: string[], _progress?: ProgressMap) {
   const [bookStatus, setBookStatus] = useState<BookStatusMap>({})
 

@@ -8,6 +8,7 @@ import { getPlatformInfo } from '../lib/platform'
  * any textbook (e.g. snip created on a different device), fall back to
  * matching by filename against the provided path map.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function resolveSnipPath(snip: Snip, pathMap?: Map<string, string>, dirPath?: string): string {
   if (!pathMap) return snip.full_path
   // Primary: look up by slug (unique per book on same device)

@@ -1,5 +1,94 @@
 # Changelog
 
+## v0.0.12
+
+### Mark / solidify system (TODO 26-30)
+
+Full status tracking for books and snips with progress visualization.
+
+**Book status** (open / in-progress / need-revisit / done)
+- New `.axiomatic/book-status.json` per library directory
+- OverviewPage: right-click → "Set status..." opens a secondary picker menu
+- ReaderToolbar: clickable status badge cycles through states
+- BookTile: subtle text pill in bottom-left ("reading" / "revisit" / "done")
+- `book-status.json` included in slug migration (orphan-safe)
+
+**Snip status** (open / solid / attention)
+- `status` field on Snip struct with `#[serde(default)]` → `"open"`
+- SnipsPage: Status column with clickable cycling badge, sortable
+- SnipsPage: context menu Status section (single + bulk operations)
+- Footer: solid/attention counts alongside total
+
+**Progress bars**
+- OverviewPage: per-directory section headers show "X/Y done" + "X/Y solid" with green bar
+- Lightweight `get_snip_status_counts` IPC (counts only, no full snip data)
+
+**Input validation**
+- `set_snip_status` / `bulk_set_snip_status` reject invalid status values
+- `set_book_status` rejects invalid status values
+
+### Snip table enhancements
+
+- **Multi-column sort** — click column header for single sort; shift+click to add secondary. Priority numbers shown (▲1, ▼2). Persisted to localStorage.
+- **Batch tag OR logic** — tags containing "batch" (case-insensitive) are OR-ed in the filter; regular tags remain AND-ed.
+- **Filter persistence** — search, directory, tags, sort columns survive app restarts via localStorage.
+- **Tag dropdown fix** — toolbar `overflow-x-auto` was clipping the absolute-positioned dropdown (CSS spec: implicit `overflow-y: auto`). Replaced with `flex-wrap`.
+- **Page counter fix** — was showing `page + 1` (double-counting; page is already 1-based).
+- **Context menu stale data** — context menu now resolves live snip from state instead of stale captured reference.
+- **Partial select** — header checkbox deselects when in indeterminate state (standard tri-state).
+- **Dir switch resets** — tag filters + row selection cleared when switching directory.
+- **Performance** — removed `transition-colors` from 600 table rows that caused jank on select-all.
+
+### Tab management
+
+- **Last tab closable** — TabBar renders with 1 tab (was hidden at ≤1).
+- **Close to Left / Right** — context menu items, conditionally hidden at edges.
+- **Ctrl+PageUp / PageDown** — tab cycling keyboard shortcuts (alongside Shift+Alt+H/L).
+- **`closeTabsToLeft` / `closeTabsToRight`** — new `useTabs` operations with navigation wrappers.
+
+### Carousel improvements
+
+- **Rename** — `r` key or double-click label opens inline rename input. Enter commits, Escape cancels.
+- **Jump to page** — `o` key + visible "p. N — open in reader (o)" button navigates to the snip's PDF page.
+- **Shuffle button redesign** — bare SVG icon replaced with labeled text button ("Sorted" / "Shuffled").
+
+### Overview page
+
+- **Refresh button** — toolbar button re-scans library directories for new PDFs.
+
+### Pomodoro timer fix
+
+- **Ghost chime** — module-level `setInterval` kept ticking after all PomodoroTimer components unmounted. Phase completions played chime with no visible UI. Fix: interval pauses when all subscribers detach, resumes on reattach. Chime only plays when at least one component is mounted.
+
+### Codebase hardening
+
+**Rust refactoring**
+- `json_storage::update_json<T, F>` — read-modify-write helper eliminates ~40 lines of duplicated load-modify-save boilerplate across 15+ commands
+- `migrate_slug_inner` — silent `.ok()` error swallowing replaced with `log::warn`
+
+**TypeScript deduplication**
+- `useDirPaths` hook — replaces identical `useMemo` in OverviewPage, SnipsPage, StatsPage
+- `usePathMap` hook — replaces identical slug→path map construction in SnipsPage, LoopPage
+- `STORAGE_KEYS` constants (`src/lib/storageKeys.ts`)
+
+**Accessibility**
+- ContextMenu: arrow key + j/k navigation, `role="menu"`/`role="menuitem"`, visual focus indicator, auto-focus on open
+
+**Bug fixes**
+- `useAllSnips`: cancellation flag prevents state updates on unmounted component
+- `useSnips`: added missing `renameSnip` callback (was in `useAllSnips` only)
+
+### Tests
+
+- **78 new tests** (53 vitest + 25 Rust)
+- **New test files (14)**: useBookStatus, useDirPaths, useTextbooks, usePomodoroConfig, useTags, useDirectories, useOutline, usePageLinks, useBatchedRender, useSyncStatus, useTheme, ContextMenu, BreakOverlay, TileGrid, SnipBanner, usePomodoroTimer
+- **New Rust tests (18)**: snip status CRUD, book status CRUD, validation, backward-compat deserialization, count aggregation, session commands, XP commands
+- **502 Vitest tests**, 91 Rust tests — all passing.
+
+### CI/CD
+
+- **APK builds** — release workflow now includes Android APK build job alongside Linux packages.
+
 ## v0.0.11
 
 ### Android mobile support
