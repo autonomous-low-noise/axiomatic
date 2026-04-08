@@ -9,6 +9,7 @@ import { useSearch } from '../hooks/useSearch'
 import { useDocument } from '../hooks/useDocument'
 import { useHighlights } from '../hooks/useHighlights'
 import { useSnips } from '../hooks/useSnips'
+import { useBookStatus } from '../hooks/useBookStatus'
 import { useTabNavigation } from '../hooks/useTabs'
 import { PdfViewer, type PdfViewerHandle } from '../components/PdfViewer'
 import { TabBar } from '../components/TabBar'
@@ -38,6 +39,7 @@ export function ReaderPage() {
   const { docInfo, loading: docLoading, error: docError } = useDocument(book?.full_path)
   const { colorHighlights, bookmarkHighlights, highlightsForPage, createHighlight, deleteHighlight, deleteHighlightGroup } = useHighlights(slug)
   const { snips, addSnip } = useSnips(slug, book?.dir_path)
+  const { getStatus: getBookStatus, setStatus: setBookStatus } = useBookStatus(dirPaths, progress)
   const { tabs, openTab, reopenTab, tabsRef, selectTab, closeTabAndNavigate, closeOtherTabsAndNavigate, closeTabsToLeftAndNavigate, closeTabsToRightAndNavigate } = useTabNavigation(slug)
 
   const [snipMode, setSnipMode] = useState(false)
@@ -425,6 +427,8 @@ export function ReaderPage() {
           onLoopSorted={() => slug && navigate(`/loop/${slug}?mode=sorted`)}
           onLoopShuffled={() => slug && navigate(`/loop/${slug}?mode=shuffled`)}
           learningTools={learningTools}
+          bookStatus={slug ? getBookStatus(slug) : undefined}
+          onSetBookStatus={slug && book ? (status) => setBookStatus(book.dir_path, slug, status) : undefined}
         />
       </div>
       {!zenMode && (

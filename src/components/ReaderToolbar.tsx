@@ -32,6 +32,8 @@ interface Props {
   onLoopSorted?: () => void
   onLoopShuffled?: () => void
   learningTools?: boolean
+  bookStatus?: import('../types/progress').BookStatus
+  onSetBookStatus?: (status: import('../types/progress').BookStatus) => void
 }
 
 export function ReaderToolbar({
@@ -59,6 +61,8 @@ export function ReaderToolbar({
   onLoopSorted,
   onLoopShuffled,
   learningTools = true,
+  bookStatus,
+  onSetBookStatus,
 }: Props) {
   const canZoomOut = zoom > MIN_ZOOM
   const canZoomIn = zoom < MAX_ZOOM
@@ -258,6 +262,27 @@ export function ReaderToolbar({
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </button>
+          {bookStatus && onSetBookStatus && (
+            <button
+              onClick={() => {
+                const order = ['open', 'in-progress', 'need-revisit', 'done'] as const
+                const idx = order.indexOf(bookStatus)
+                onSetBookStatus(order[(idx + 1) % order.length])
+              }}
+              className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                bookStatus === 'done'
+                  ? 'bg-[#859900]/20 text-[#859900]'
+                  : bookStatus === 'need-revisit'
+                    ? 'bg-[#cb4b16]/20 text-[#cb4b16]'
+                    : bookStatus === 'in-progress'
+                      ? 'bg-[#268bd2]/20 text-[#268bd2]'
+                      : 'bg-[#93a1a1]/20 text-[#93a1a1]'
+              }`}
+              aria-label="Cycle book status"
+            >
+              {bookStatus}
+            </button>
+          )}
           <button
             onClick={togglePalette}
             className={iconBtnClass}
