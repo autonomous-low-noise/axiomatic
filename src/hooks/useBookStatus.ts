@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { BookStatus, BookStatusMap, ProgressMap } from '../types/progress'
 
-export function useBookStatus(dirPaths: string[], progress: ProgressMap) {
+export function useBookStatus(dirPaths: string[], _progress?: ProgressMap) {
   const [bookStatus, setBookStatus] = useState<BookStatusMap>({})
 
   useEffect(() => {
@@ -29,10 +29,8 @@ export function useBookStatus(dirPaths: string[], progress: ProgressMap) {
   }, [JSON.stringify(dirPaths)])
 
   const getStatus = useCallback((slug: string): BookStatus => {
-    if (bookStatus[slug]) return bookStatus[slug]
-    // Derive default: has progress → in-progress, else open
-    return progress[slug] ? 'in-progress' : 'open'
-  }, [bookStatus, progress])
+    return bookStatus[slug] ?? 'open'
+  }, [bookStatus])
 
   const setStatus = useCallback(async (dirPath: string, slug: string, status: BookStatus) => {
     setBookStatus((prev) => ({ ...prev, [slug]: status }))

@@ -46,7 +46,8 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       {items.map((item) => (
         <button
           key={item.label}
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation()
             item.action()
             onClose()
           }}

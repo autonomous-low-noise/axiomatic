@@ -47,6 +47,8 @@ export function OverviewPage() {
   const [explorerOpen, setExplorerOpen] = useState(false)
   const [tagManagerOpen, setTagManagerOpen] = useState(false)
   const [tagAssignerSlug, setTagAssignerSlug] = useState<string | null>(null)
+  const [statusPickerSlug, setStatusPickerSlug] = useState<string | null>(null)
+  const [statusPickerPos, setStatusPickerPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   const [activeTagFilters, setActiveTagFilters] = useState<Set<number>>(new Set())
   const filterInputRef = useRef<HTMLInputElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
@@ -243,10 +245,13 @@ export function OverviewPage() {
             label: 'Tag',
             action: () => setTagAssignerSlug(book.slug),
           },
-          ...(['open', 'in-progress', 'need-revisit', 'done'] as const).map((s) => ({
-            label: `${getStatus(book.slug) === s ? '\u25CF ' : '  '}${s.charAt(0).toUpperCase() + s.slice(1)}`,
-            action: () => setBookStatus(book.dir_path, book.slug, s),
-          })),
+          {
+            label: 'Set status...',
+            action: () => {
+              setStatusPickerSlug(book.slug)
+              setStatusPickerPos({ x: menu!.x + 160, y: menu!.y })
+            },
+          },
           {
             label: 'Rename',
             action: async () => {
@@ -589,8 +594,24 @@ export function OverviewPage() {
         />
       )}
       {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={closeMenu} />
+        <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => { closeMenu(); setStatusPickerSlug(null) }} />
       )}
+      {statusPickerSlug && (() => {
+        const book = textbooks.find((b) => b.slug === statusPickerSlug)
+        if (!book) return null
+        const statuses = ['open', 'in-progress', 'need-revisit', 'done'] as const
+        return (
+          <ContextMenu
+            x={statusPickerPos.x}
+            y={statusPickerPos.y}
+            items={statuses.map((s) => ({
+              label: `${getStatus(book.slug) === s ? '\u25CF ' : '  '}${s.charAt(0).toUpperCase() + s.slice(1)}`,
+              action: () => { setBookStatus(book.dir_path, book.slug, s); closeMenu(); setStatusPickerSlug(null) },
+            }))}
+            onClose={() => setStatusPickerSlug(null)}
+          />
+        )
+      })()}
       {explorerOpen && (
         <DirectoryExplorer
           directories={directories}

@@ -54,14 +54,14 @@ export const BookTile = memo(function BookTile({
       <div className="relative">
         <PdfThumbnail fullPath={fullPath} />
         {bookStatus && bookStatus !== 'open' && (
-          <span className={`absolute top-1.5 left-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full text-white text-[8px] ${
+          <span className={`absolute bottom-2 left-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-medium text-white ${
             bookStatus === 'done'
-              ? 'bg-[#859900]'
+              ? 'bg-[#859900]/90'
               : bookStatus === 'need-revisit'
-                ? 'bg-[#cb4b16]'
-                : 'bg-[#268bd2]'
+                ? 'bg-[#cb4b16]/90'
+                : 'bg-[#268bd2]/90'
           }`}>
-            {bookStatus === 'done' ? '\u2713' : bookStatus === 'need-revisit' ? '!' : '\u25B6'}
+            {bookStatus === 'done' ? 'done' : bookStatus === 'need-revisit' ? 'revisit' : 'reading'}
           </span>
         )}
         {progressText && (
