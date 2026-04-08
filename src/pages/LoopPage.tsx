@@ -16,7 +16,7 @@ export function LoopPage() {
 
   const { textbooks, loading } = useTextbooks()
   const book = textbooks.find((b) => b.slug === slug)
-  const { snips, xp, incrementXp } = useSnips(slug, book?.dir_path)
+  const { snips, xp, incrementXp, renameSnip } = useSnips(slug, book?.dir_path)
   const pathMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const tb of textbooks) {
@@ -99,6 +99,7 @@ export function LoopPage() {
         shuffled={shuffled}
         pathMap={pathMap}
         dirPath={book?.dir_path}
+        onRename={renameSnip}
       />
     </div>
   )

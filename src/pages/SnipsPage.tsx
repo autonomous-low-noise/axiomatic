@@ -23,8 +23,28 @@ interface ContextMenuState {
   snip: SnipWithDir
 }
 
-// Module-level cache: survives component unmount/remount within the same session
-const _filterCache = { search: '', dirFilter: 'all', selectedTags: [] as string[] }
+const FILTER_STORAGE_KEY = 'axiomatic:snips-filter'
+
+interface FilterCache {
+  search: string
+  dirFilter: string
+  selectedTags: string[]
+}
+
+function loadFilterCache(): FilterCache {
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return { search: '', dirFilter: 'all', selectedTags: [] }
+}
+
+function saveFilterCache(cache: FilterCache) {
+  localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(cache))
+}
+
+// Module-level cache: survives unmount/remount within session, persists across restarts via localStorage
+const _filterCache = loadFilterCache()
 
 /** @internal — test-only reset */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -32,6 +52,7 @@ export function _resetFilterCache() {
   _filterCache.search = ''
   _filterCache.dirFilter = 'all'
   _filterCache.selectedTags = []
+  localStorage.removeItem(FILTER_STORAGE_KEY)
 }
 
 export function SnipsPage() {
@@ -65,13 +86,13 @@ export function SnipsPage() {
 
   const [search, _setSearch] = useState(_filterCache.search)
   const setSearch = useCallback((v: string | ((prev: string) => string)) => {
-    _setSearch((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.search = next; return next })
+    _setSearch((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.search = next; saveFilterCache(_filterCache); return next })
   }, [])
   const [dirFilter, _setDirFilter] = useState<string>(_filterCache.dirFilter)
-  const setDirFilter = useCallback((v: string) => { _filterCache.dirFilter = v; _setDirFilter(v); _filterCache.selectedTags = []; _setSelectedTags([]); setSelectedIds(new Set()) }, [])
+  const setDirFilter = useCallback((v: string) => { _filterCache.dirFilter = v; _setDirFilter(v); _filterCache.selectedTags = []; _setSelectedTags([]); setSelectedIds(new Set()); saveFilterCache(_filterCache) }, [])
   const [selectedTags, _setSelectedTags] = useState<string[]>(_filterCache.selectedTags)
   const setSelectedTags = useCallback((v: string[] | ((prev: string[]) => string[])) => {
-    _setSelectedTags((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.selectedTags = next; return next })
+    _setSelectedTags((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.selectedTags = next; saveFilterCache(_filterCache); return next })
   }, [])
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
@@ -860,6 +881,7 @@ export function SnipsPage() {
             shuffled={false}
             noXp={true}
             pathMap={pathMap}
+            onRename={renameSnip}
           />
         </div>
       )}
@@ -890,6 +912,7 @@ export function SnipsPage() {
             viewMode={true}
             initialIndex={viewStartIndex}
             pathMap={pathMap}
+            onRename={renameSnip}
           />
         </div>
       )}

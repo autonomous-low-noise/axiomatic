@@ -27,6 +27,8 @@ interface LoopCarouselProps {
   pathMap?: Map<string, string>
   /** Library directory path for cross-device resolution */
   dirPath?: string
+  /** Rename callback — receives dirPath, snip id, new label */
+  onRename?: (dirPath: string, snipId: string, newLabel: string) => Promise<void>
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -50,8 +52,12 @@ export function LoopCarousel({
   initialIndex,
   pathMap,
   dirPath,
+  onRename,
 }: LoopCarouselProps) {
   const [notesOpen, setNotesOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<EditorView | null>(null)
   const cardAreaRef = useRef<HTMLDivElement>(null)
   const { ensureNote, setNote } = useNotes()
@@ -118,6 +124,30 @@ export function LoopCarousel({
     if (!viewMode) setRevealed(false)
   }, [orderedSnips.length, viewMode])
 
+  const startRename = useCallback(() => {
+    if (!current || !onRename) return
+    setRenameValue(current.label)
+    setRenaming(true)
+    setTimeout(() => renameInputRef.current?.select(), 0)
+  }, [current, onRename])
+
+  const commitRename = useCallback(async () => {
+    if (!current || !onRename) return
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== current.label) {
+      const withDir = current as Snip & { dirPath?: string }
+      const dp = withDir.dirPath ?? dirPath ?? ''
+      await onRename(dp, current.id, trimmed)
+      // Update label in orderedSnips so it reflects immediately
+      setOrderedSnips((prev) => prev.map((s) => s.id === current.id ? { ...s, label: trimmed } : s))
+    }
+    setRenaming(false)
+  }, [current, onRename, renameValue, dirPath])
+
+  const cancelRename = useCallback(() => {
+    setRenaming(false)
+  }, [])
+
   const handleToggleShuffle = useCallback(() => {
     const next = !isShuffled
     setIsShuffled(next)
@@ -178,6 +208,10 @@ export function LoopCarousel({
           e.preventDefault()
           handlePrev()
           break
+        case 'r':
+          e.preventDefault()
+          startRename()
+          break
         case 'Escape':
           e.preventDefault()
           onExit()
@@ -186,7 +220,7 @@ export function LoopCarousel({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleNext, handlePrev, onExit])
+  }, [handleNext, handlePrev, onExit, startRename])
 
   if (!current) {
     return (
@@ -244,9 +278,27 @@ export function LoopCarousel({
 
         {/* Card */}
         <div className={`flex w-full flex-col items-center gap-4 overflow-hidden rounded-lg border border-[#eee8d5] bg-white p-4 shadow-sm sm:p-8 dark:border-[#073642] dark:bg-[#073642] ${revealed ? 'max-w-full' : 'max-w-full sm:max-w-2xl'}`}>
-          <h2 className="text-center text-2xl font-semibold text-[#657b83] dark:text-[#93a1a1]">
-            {current.label}
-          </h2>
+          {renaming ? (
+            <input
+              ref={renameInputRef}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename()
+                else if (e.key === 'Escape') cancelRename()
+                e.stopPropagation()
+              }}
+              onBlur={commitRename}
+              className="w-full max-w-md rounded border border-[#268bd2] bg-transparent text-center text-2xl font-semibold text-[#657b83] outline-none dark:text-[#93a1a1]"
+            />
+          ) : (
+            <h2
+              className="text-center text-2xl font-semibold text-[#657b83] dark:text-[#93a1a1]"
+              onDoubleClick={onRename ? startRename : undefined}
+            >
+              {current.label}
+            </h2>
+          )}
           <p className="text-sm text-[#93a1a1] dark:text-[#586e75]">
             p. {current.page}
           </p>

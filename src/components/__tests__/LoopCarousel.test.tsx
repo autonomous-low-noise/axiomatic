@@ -810,4 +810,65 @@ describe('LoopCarousel', () => {
       expect(screen.getByText('Card 2')).toBeInTheDocument()
     })
   })
+
+  it('r key opens rename input with current label', async () => {
+    const onRename = vi.fn().mockResolvedValue(undefined)
+    const snips = [makeSnip({ id: 's1', label: 'Old Name' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} onRename={onRename} dirPath="/lib" />,
+    )
+    await waitFor(() => expect(screen.getByText('Old Name')).toBeInTheDocument())
+
+    fireEvent.keyDown(window, { key: 'r' })
+    const input = screen.getByDisplayValue('Old Name')
+    expect(input).toBeInTheDocument()
+  })
+
+  it('rename commits on Enter and updates label', async () => {
+    const onRename = vi.fn().mockResolvedValue(undefined)
+    const snips = [makeSnip({ id: 's1', label: 'Old Name' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} onRename={onRename} dirPath="/lib" />,
+    )
+    await waitFor(() => expect(screen.getByText('Old Name')).toBeInTheDocument())
+
+    fireEvent.keyDown(window, { key: 'r' })
+    const input = screen.getByDisplayValue('Old Name')
+    fireEvent.change(input, { target: { value: 'New Name' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(onRename).toHaveBeenCalledWith('/lib', 's1', 'New Name')
+      expect(screen.getByText('New Name')).toBeInTheDocument()
+    })
+  })
+
+  it('rename cancels on Escape without calling onRename', async () => {
+    const onRename = vi.fn().mockResolvedValue(undefined)
+    const snips = [makeSnip({ id: 's1', label: 'Keep Me' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} onRename={onRename} dirPath="/lib" />,
+    )
+    await waitFor(() => expect(screen.getByText('Keep Me')).toBeInTheDocument())
+
+    fireEvent.keyDown(window, { key: 'r' })
+    const input = screen.getByDisplayValue('Keep Me')
+    fireEvent.change(input, { target: { value: 'Changed' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(onRename).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByText('Keep Me')).toBeInTheDocument())
+  })
+
+  it('double-click on label opens rename input', async () => {
+    const onRename = vi.fn().mockResolvedValue(undefined)
+    const snips = [makeSnip({ id: 's1', label: 'Click Me' })]
+    render(
+      <LoopCarousel snips={snips} xp={0} onIncrementXp={vi.fn().mockResolvedValue(0)} onExit={vi.fn()} shuffled={false} onRename={onRename} dirPath="/lib" />,
+    )
+    await waitFor(() => expect(screen.getByText('Click Me')).toBeInTheDocument())
+
+    fireEvent.doubleClick(screen.getByText('Click Me'))
+    expect(screen.getByDisplayValue('Click Me')).toBeInTheDocument()
+  })
 })

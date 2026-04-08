@@ -605,6 +605,20 @@ describe('SnipsPage', () => {
     expect(screen.queryByText('Only T')).not.toBeInTheDocument()
   })
 
+  it('filter state persists to localStorage', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Snip A', tags: ['algebra'], created_at: '2024-06-01T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Change directory filter
+    fireEvent.change(screen.getByDisplayValue('All directories'), { target: { value: '/lib' } })
+
+    // Verify localStorage was updated
+    const stored = JSON.parse(localStorage.getItem('axiomatic:snips-filter') ?? '{}')
+    expect(stored.dirFilter).toBe('/lib')
+  })
+
   it('switching directory filter clears selected tags and row selection', () => {
     const snips = [
       makeSnip({ id: 's1', label: 'Both', tags: ['algebra', 'topology'], created_at: '2024-06-01T00:00:00Z' }),
