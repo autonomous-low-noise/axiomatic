@@ -504,6 +504,130 @@ mod tests {
         assert_eq!(defs[0].color, "#268bd2");
     }
 
+    // ================================================================
+    // Snip status operations
+    // ================================================================
+
+    #[test]
+    fn test_set_snip_status() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        let snip = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 1, "a".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        assert_eq!(snip.status, "open");
+
+        set_snip_status(dp.clone(), snip.id.clone(), "solid".into()).unwrap();
+
+        let snips = list_all_snips(dp).unwrap();
+        assert_eq!(snips[0].status, "solid");
+    }
+
+    #[test]
+    fn test_set_snip_status_validates() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        let snip = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 1, "a".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+
+        let result = set_snip_status(dp, snip.id.clone(), "foo".into());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid snip status 'foo'"), "got: {}", err);
+        assert!(err.contains("open"), "error should list valid statuses, got: {}", err);
+    }
+
+    #[test]
+    fn test_bulk_set_snip_status() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        let s1 = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 1, "a".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        let s2 = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 2, "b".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        let s3 = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 3, "c".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+
+        bulk_set_snip_status(dp.clone(), vec![s1.id.clone(), s3.id.clone()], "attention".into()).unwrap();
+
+        let snips = list_all_snips(dp).unwrap();
+        let find = |id: &str| snips.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(find(&s1.id).status, "attention");
+        assert_eq!(find(&s2.id).status, "open");
+        assert_eq!(find(&s3.id).status, "attention");
+    }
+
+    #[test]
+    fn test_snip_status_default_on_deserialize() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        // Write a snip JSON without the "status" field
+        let axiomatic_dir = dir.path().join(".axiomatic");
+        std::fs::create_dir_all(&axiomatic_dir).unwrap();
+        let raw = r#"[{
+            "id": "aaaa-bbbb",
+            "slug": "s",
+            "full_path": "/a.pdf",
+            "page": 1,
+            "label": "no status field",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 1.0,
+            "height": 1.0,
+            "created_at": "2025-01-01T00:00:00Z",
+            "tags": []
+        }]"#;
+        std::fs::write(axiomatic_dir.join("snips.json"), raw).unwrap();
+
+        let snips = list_all_snips(dp).unwrap();
+        assert_eq!(snips.len(), 1);
+        assert_eq!(snips[0].status, "open");
+    }
+
+    #[test]
+    fn test_get_snip_status_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        let s1 = create_snip(dp.clone(), "book-a".into(), "/a.pdf".into(), 1, "a".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        let s2 = create_snip(dp.clone(), "book-a".into(), "/a.pdf".into(), 2, "b".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        let _s3 = create_snip(dp.clone(), "book-b".into(), "/b.pdf".into(), 1, "c".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+
+        set_snip_status(dp.clone(), s1.id.clone(), "solid".into()).unwrap();
+        set_snip_status(dp.clone(), s2.id.clone(), "solid".into()).unwrap();
+
+        let counts = get_snip_status_counts(dp).unwrap();
+        // book-a: (total=2, solid=2)
+        assert_eq!(counts.get("book-a"), Some(&(2, 2)));
+        // book-b: (total=1, solid=0)
+        assert_eq!(counts.get("book-b"), Some(&(1, 0)));
+    }
+
+    // ================================================================
+    // Delete snip
+    // ================================================================
+
+    #[test]
+    fn test_delete_snip() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        let snip = create_snip(dp.clone(), "s".into(), "/a.pdf".into(), 1, "a".into(), 0.0, 0.0, 1.0, 1.0).unwrap();
+        assert_eq!(list_all_snips(dp.clone()).unwrap().len(), 1);
+
+        delete_snip(dp.clone(), snip.id.clone()).unwrap();
+
+        assert!(list_all_snips(dp).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_snip_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let dp = dir.path().to_string_lossy().to_string();
+
+        // Deleting a nonexistent snip should not error
+        let result = delete_snip(dp, "does-not-exist".into());
+        assert!(result.is_ok());
+    }
+
     #[test]
     fn now_iso8601_returns_valid_timestamp() {
         let ts = now_iso8601();

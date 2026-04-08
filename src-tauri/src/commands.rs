@@ -1493,5 +1493,154 @@ mod tests {
         assert_eq!(title_from_stem("hello-world"), "Hello World");
         assert_eq!(title_from_stem("foo_bar"), "Foo Bar");
     }
+
+    // ================================================================
+    // Book status commands
+    // ================================================================
+
+    #[test]
+    fn test_book_status_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        set_book_status(dir_path.clone(), "book-a".into(), "open".into()).unwrap();
+        set_book_status(dir_path.clone(), "book-b".into(), "done".into()).unwrap();
+
+        let all = get_all_book_status(dir_path).unwrap();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all["book-a"], "open");
+        assert_eq!(all["book-b"], "done");
+    }
+
+    #[test]
+    fn test_book_status_overwrite() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        set_book_status(dir_path.clone(), "book-a".into(), "open".into()).unwrap();
+        set_book_status(dir_path.clone(), "book-a".into(), "done".into()).unwrap();
+
+        let all = get_all_book_status(dir_path).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all["book-a"], "done");
+    }
+
+    #[test]
+    fn test_book_status_validates() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        let result = set_book_status(dir_path, "book-a".into(), "invalid".into());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid book status"), "Error should mention invalid status, got: {}", err);
+    }
+
+    #[test]
+    fn test_book_status_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        let all = get_all_book_status(dir_path).unwrap();
+        assert!(all.is_empty());
+    }
+
+    // ================================================================
+    // Progress commands (multi-slug)
+    // ================================================================
+
+    #[test]
+    fn test_save_progress_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        save_progress(
+            dir_path.clone(),
+            "alpha".into(),
+            BookProgress {
+                current_page: 5,
+                total_pages: 100,
+                last_read_at: "2026-04-01T10:00:00Z".into(),
+            },
+        ).unwrap();
+
+        save_progress(
+            dir_path.clone(),
+            "beta".into(),
+            BookProgress {
+                current_page: 20,
+                total_pages: 300,
+                last_read_at: "2026-04-02T11:00:00Z".into(),
+            },
+        ).unwrap();
+
+        let all = get_all_progress(dir_path).unwrap();
+        assert_eq!(all.len(), 2);
+
+        let a = all.get("alpha").unwrap();
+        assert_eq!(a.current_page, 5);
+        assert_eq!(a.total_pages, 100);
+        assert_eq!(a.last_read_at, "2026-04-01T10:00:00Z");
+
+        let b = all.get("beta").unwrap();
+        assert_eq!(b.current_page, 20);
+        assert_eq!(b.total_pages, 300);
+        assert_eq!(b.last_read_at, "2026-04-02T11:00:00Z");
+    }
+
+    // ================================================================
+    // Starred commands
+    // ================================================================
+
+    #[test]
+    fn test_toggle_starred() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        // Toggle on
+        let on = toggle_starred(dir_path.clone(), "my-book".into()).unwrap();
+        assert!(on, "First toggle should star the book");
+
+        let starred = get_starred(dir_path.clone()).unwrap();
+        assert!(starred.contains(&"my-book".to_string()));
+
+        // Toggle off
+        let off = toggle_starred(dir_path.clone(), "my-book".into()).unwrap();
+        assert!(!off, "Second toggle should unstar the book");
+
+        let starred = get_starred(dir_path).unwrap();
+        assert!(!starred.contains(&"my-book".to_string()));
+    }
+
+    // ================================================================
+    // XP commands
+    // ================================================================
+
+    #[test]
+    fn test_get_xp_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        let xp = get_xp(dir_path, "unknown-slug".into()).unwrap();
+        assert_eq!(xp, 0);
+    }
+
+    #[test]
+    fn test_increment_xp() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+
+        let v1 = increment_xp(dir_path.clone(), "slug-x".into()).unwrap();
+        assert_eq!(v1, 1);
+
+        let v2 = increment_xp(dir_path.clone(), "slug-x".into()).unwrap();
+        assert_eq!(v2, 2);
+
+        let v3 = increment_xp(dir_path.clone(), "slug-x".into()).unwrap();
+        assert_eq!(v3, 3);
+
+        let final_xp = get_xp(dir_path, "slug-x".into()).unwrap();
+        assert_eq!(final_xp, 3);
+    }
 }
 
