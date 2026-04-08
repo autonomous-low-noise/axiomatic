@@ -27,21 +27,37 @@ const FILTER_STORAGE_KEY = 'axiomatic:snips-filter'
 
 type SortKey = 'created_at' | 'label' | 'source' | 'page'
 type SortDir = 'asc' | 'desc'
+interface SortColumn { key: SortKey; dir: SortDir }
 
 interface FilterCache {
   search: string
   dirFilter: string
   selectedTags: string[]
-  sortKey: SortKey
-  sortDir: SortDir
+  sortColumns: SortColumn[]
+  /** @deprecated — migrated to sortColumns */
+  sortKey?: SortKey
+  /** @deprecated — migrated to sortColumns */
+  sortDir?: SortDir
 }
+
+const DEFAULT_SORT: SortColumn[] = [{ key: 'created_at', dir: 'asc' }]
 
 function loadFilterCache(): FilterCache {
   try {
     const raw = localStorage.getItem(FILTER_STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // Migrate old single sortKey/sortDir to sortColumns
+      if (!parsed.sortColumns && parsed.sortKey) {
+        parsed.sortColumns = [{ key: parsed.sortKey, dir: parsed.sortDir ?? 'asc' }]
+        delete parsed.sortKey
+        delete parsed.sortDir
+      }
+      if (!parsed.sortColumns) parsed.sortColumns = DEFAULT_SORT
+      return parsed
+    }
   } catch { /* ignore */ }
-  return { search: '', dirFilter: 'all', selectedTags: [], sortKey: 'created_at' as SortKey, sortDir: 'asc' as SortDir }
+  return { search: '', dirFilter: 'all', selectedTags: [], sortColumns: DEFAULT_SORT }
 }
 
 function saveFilterCache(cache: FilterCache) {
@@ -57,8 +73,7 @@ export function _resetFilterCache() {
   _filterCache.search = ''
   _filterCache.dirFilter = 'all'
   _filterCache.selectedTags = []
-  _filterCache.sortKey = 'created_at'
-  _filterCache.sortDir = 'asc'
+  _filterCache.sortColumns = [{ key: 'created_at', dir: 'asc' }]
   localStorage.removeItem(FILTER_STORAGE_KEY)
 }
 
@@ -101,16 +116,30 @@ export function SnipsPage() {
   const setSelectedTags = useCallback((v: string[] | ((prev: string[]) => string[])) => {
     _setSelectedTags((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.selectedTags = next; saveFilterCache(_filterCache); return next })
   }, [])
-  const [sortKey, _setSortKey] = useState<SortKey>(_filterCache.sortKey)
-  const [sortDir, _setSortDir] = useState<SortDir>(_filterCache.sortDir)
-  const toggleSort = useCallback((key: SortKey) => {
-    _setSortKey((prevKey) => {
-      const newDir = prevKey === key && _filterCache.sortDir === 'asc' ? 'desc' : 'asc'
-      _filterCache.sortKey = key
-      _filterCache.sortDir = newDir
-      _setSortDir(newDir)
+  const [sortColumns, setSortColumns] = useState<SortColumn[]>(_filterCache.sortColumns)
+  const toggleSort = useCallback((key: SortKey, shiftKey: boolean) => {
+    setSortColumns((prev) => {
+      let next: SortColumn[]
+      const idx = prev.findIndex((c) => c.key === key)
+      if (shiftKey) {
+        // Shift+click: add column or toggle direction of existing
+        next = [...prev]
+        if (idx >= 0) {
+          next[idx] = { key, dir: next[idx].dir === 'asc' ? 'desc' : 'asc' }
+        } else {
+          next.push({ key, dir: 'asc' })
+        }
+      } else {
+        // Plain click: single-column sort, toggle if same key
+        if (prev.length === 1 && prev[0].key === key) {
+          next = [{ key, dir: prev[0].dir === 'asc' ? 'desc' : 'asc' }]
+        } else {
+          next = [{ key, dir: 'asc' }]
+        }
+      }
+      _filterCache.sortColumns = next
       saveFilterCache(_filterCache)
-      return key
+      return next
     })
   }, [])
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
@@ -166,18 +195,21 @@ export function SnipsPage() {
       const q = search.trim().toLowerCase()
       result = result.filter((s) => s.label.toLowerCase().includes(q))
     }
-    const dir = sortDir === 'asc' ? 1 : -1
     return [...result].sort((a, b) => {
-      let cmp = 0
-      switch (sortKey) {
-        case 'label': cmp = a.label.localeCompare(b.label); break
-        case 'source': cmp = (slugToTitle[a.slug] ?? a.slug).localeCompare(slugToTitle[b.slug] ?? b.slug); break
-        case 'page': cmp = a.page - b.page; break
-        default: cmp = a.created_at.localeCompare(b.created_at); break
+      for (const { key, dir } of sortColumns) {
+        const m = dir === 'asc' ? 1 : -1
+        let cmp = 0
+        switch (key) {
+          case 'label': cmp = a.label.localeCompare(b.label); break
+          case 'source': cmp = (slugToTitle[a.slug] ?? a.slug).localeCompare(slugToTitle[b.slug] ?? b.slug); break
+          case 'page': cmp = a.page - b.page; break
+          default: cmp = a.created_at.localeCompare(b.created_at); break
+        }
+        if (cmp !== 0) return cmp * m
       }
-      return cmp * dir || a.slug.localeCompare(b.slug) || a.page - b.page
+      return a.slug.localeCompare(b.slug) || a.page - b.page
     })
-  }, [snips, dirFilter, selectedTags, search, sortKey, sortDir, slugToTitle])
+  }, [snips, dirFilter, selectedTags, search, sortColumns, slugToTitle])
 
   const highlightedSnip = selectedIndex >= 0 ? filteredSnips[selectedIndex] : undefined
   const noteContent = useNoteContent(highlightedSnip?.slug, highlightedSnip?.page ?? 0)
@@ -636,19 +668,24 @@ export function SnipsPage() {
                     />
                   </th>
                 )}
-                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('label')}>
-                  Label{sortKey === 'label' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                </th>
-                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('source')}>
-                  Source{sortKey === 'source' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                </th>
-                <th className="cursor-pointer px-4 py-2 text-right select-none" onClick={() => toggleSort('page')}>
-                  Page{sortKey === 'page' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                </th>
+                {(['label', 'source', 'page', 'created_at'] as SortKey[]).map((key) => {
+                  const idx = sortColumns.findIndex((c) => c.key === key)
+                  const col = idx >= 0 ? sortColumns[idx] : null
+                  const arrow = col ? (col.dir === 'asc' ? '▲' : '▼') : ''
+                  const rank = col && sortColumns.length > 1 ? `${idx + 1}` : ''
+                  const label = key === 'created_at' ? 'Created' : key === 'page' ? 'Page' : key.charAt(0).toUpperCase() + key.slice(1)
+                  return (
+                    <th
+                      key={key}
+                      className={`cursor-pointer px-4 py-2 select-none${key === 'page' ? ' text-right' : ''}`}
+                      onClick={(e) => toggleSort(key, e.shiftKey)}
+                    >
+                      {label}
+                      {arrow && <span className="ml-1 text-[10px]">{arrow}{rank}</span>}
+                    </th>
+                  )
+                })}
                 <th className="px-4 py-2">Tags</th>
-                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('created_at')}>
-                  Created{sortKey === 'created_at' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                </th>
               </tr>
             </thead>
             <tbody>

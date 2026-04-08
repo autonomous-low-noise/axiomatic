@@ -597,6 +597,29 @@ describe('SnipsPage', () => {
     expect(rows[1]).toHaveTextContent('Low pg')
   })
 
+  it('shift+click adds secondary sort column', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'A', slug: 'algebra', page: 10, created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'B', slug: 'algebra', page: 2,  created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'C', slug: 'topology', page: 1, created_at: '2024-06-01T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Sort by source first
+    const sourceHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Source'))!
+    fireEvent.click(sourceHeader)
+
+    // Shift+click page → secondary sort by page within each source
+    const pageHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Page'))!
+    fireEvent.click(pageHeader, { shiftKey: true })
+
+    const rows = screen.getAllByRole('row').slice(1)
+    // algebra (page 2, page 10), then topology (page 1)
+    expect(rows[0]).toHaveTextContent('B') // algebra p2
+    expect(rows[1]).toHaveTextContent('A') // algebra p10
+    expect(rows[2]).toHaveTextContent('C') // topology p1
+  })
+
   it('context menu is scrollable with max-height', () => {
     stubTagDefs.defs = Array.from({ length: 20 }, (_, i) => ({ name: `tag-${i}`, color: '#268bd2' }))
     renderPage()
