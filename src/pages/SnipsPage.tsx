@@ -25,10 +25,15 @@ interface ContextMenuState {
 
 const FILTER_STORAGE_KEY = 'axiomatic:snips-filter'
 
+type SortKey = 'created_at' | 'label' | 'source' | 'page'
+type SortDir = 'asc' | 'desc'
+
 interface FilterCache {
   search: string
   dirFilter: string
   selectedTags: string[]
+  sortKey: SortKey
+  sortDir: SortDir
 }
 
 function loadFilterCache(): FilterCache {
@@ -36,7 +41,7 @@ function loadFilterCache(): FilterCache {
     const raw = localStorage.getItem(FILTER_STORAGE_KEY)
     if (raw) return JSON.parse(raw)
   } catch { /* ignore */ }
-  return { search: '', dirFilter: 'all', selectedTags: [] }
+  return { search: '', dirFilter: 'all', selectedTags: [], sortKey: 'created_at' as SortKey, sortDir: 'asc' as SortDir }
 }
 
 function saveFilterCache(cache: FilterCache) {
@@ -52,6 +57,8 @@ export function _resetFilterCache() {
   _filterCache.search = ''
   _filterCache.dirFilter = 'all'
   _filterCache.selectedTags = []
+  _filterCache.sortKey = 'created_at'
+  _filterCache.sortDir = 'asc'
   localStorage.removeItem(FILTER_STORAGE_KEY)
 }
 
@@ -94,6 +101,18 @@ export function SnipsPage() {
   const setSelectedTags = useCallback((v: string[] | ((prev: string[]) => string[])) => {
     _setSelectedTags((prev) => { const next = typeof v === 'function' ? v(prev) : v; _filterCache.selectedTags = next; saveFilterCache(_filterCache); return next })
   }, [])
+  const [sortKey, _setSortKey] = useState<SortKey>(_filterCache.sortKey)
+  const [sortDir, _setSortDir] = useState<SortDir>(_filterCache.sortDir)
+  const toggleSort = useCallback((key: SortKey) => {
+    _setSortKey((prevKey) => {
+      const newDir = prevKey === key && _filterCache.sortDir === 'asc' ? 'desc' : 'asc'
+      _filterCache.sortKey = key
+      _filterCache.sortDir = newDir
+      _setSortDir(newDir)
+      saveFilterCache(_filterCache)
+      return key
+    })
+  }, [])
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
   const [tagSearch, setTagSearch] = useState('')
   const [loopOpen, setLoopOpen] = useState(false)
@@ -135,15 +154,30 @@ export function SnipsPage() {
     let result = snips
     if (dirFilter !== 'all') result = result.filter((s) => s.dirPath === dirFilter)
     if (selectedTags.length > 0) {
-      const tagSet = new Set(selectedTags)
-      result = result.filter((s) => [...tagSet].every((t) => s.tags.includes(t)))
+      const isBatch = (t: string) => t.toLowerCase().includes('batch')
+      const andTags = selectedTags.filter((t) => !isBatch(t))
+      const orTags = selectedTags.filter(isBatch)
+      result = result.filter((s) =>
+        andTags.every((t) => s.tags.includes(t)) &&
+        (orTags.length === 0 || orTags.some((t) => s.tags.includes(t))),
+      )
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       result = result.filter((s) => s.label.toLowerCase().includes(q))
     }
-    return [...result].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.slug.localeCompare(b.slug) || a.page - b.page)
-  }, [snips, dirFilter, selectedTags, search])
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...result].sort((a, b) => {
+      let cmp = 0
+      switch (sortKey) {
+        case 'label': cmp = a.label.localeCompare(b.label); break
+        case 'source': cmp = (slugToTitle[a.slug] ?? a.slug).localeCompare(slugToTitle[b.slug] ?? b.slug); break
+        case 'page': cmp = a.page - b.page; break
+        default: cmp = a.created_at.localeCompare(b.created_at); break
+      }
+      return cmp * dir || a.slug.localeCompare(b.slug) || a.page - b.page
+    })
+  }, [snips, dirFilter, selectedTags, search, sortKey, sortDir, slugToTitle])
 
   const highlightedSnip = selectedIndex >= 0 ? filteredSnips[selectedIndex] : undefined
   const noteContent = useNoteContent(highlightedSnip?.slug, highlightedSnip?.page ?? 0)
@@ -602,11 +636,19 @@ export function SnipsPage() {
                     />
                   </th>
                 )}
-                <th className="px-4 py-2">Label</th>
-                <th className="px-4 py-2">Source</th>
-                <th className="px-4 py-2 text-right">Page</th>
+                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('label')}>
+                  Label{sortKey === 'label' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                </th>
+                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('source')}>
+                  Source{sortKey === 'source' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                </th>
+                <th className="cursor-pointer px-4 py-2 text-right select-none" onClick={() => toggleSort('page')}>
+                  Page{sortKey === 'page' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                </th>
                 <th className="px-4 py-2">Tags</th>
-                <th className="px-4 py-2">Created</th>
+                <th className="cursor-pointer px-4 py-2 select-none" onClick={() => toggleSort('created_at')}>
+                  Created{sortKey === 'created_at' && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                </th>
               </tr>
             </thead>
             <tbody>

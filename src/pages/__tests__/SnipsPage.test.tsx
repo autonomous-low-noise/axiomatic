@@ -551,6 +551,52 @@ describe('SnipsPage', () => {
     expect(rows[2]).toHaveTextContent('B page 5')
   })
 
+  it('clicking Source header sorts by source', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'Snip A', slug: 'topology', created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Snip B', slug: 'algebra', created_at: '2024-06-01T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Default sort is by created_at → same timestamp, tiebreak by slug: algebra first
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Snip B') // algebra
+    expect(rows[1]).toHaveTextContent('Snip A') // topology
+
+    // Click Source header → sort by source asc (same order since algebra < topology)
+    fireEvent.click(screen.getByText('Source'))
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Snip B')
+    expect(rows[1]).toHaveTextContent('Snip A')
+
+    // Click again → desc
+    fireEvent.click(screen.getByText(/Source/))
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Snip A') // topology first desc
+    expect(rows[1]).toHaveTextContent('Snip B')
+  })
+
+  it('clicking Page header sorts by page number', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'High pg', slug: 'algebra', page: 10, created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'Low pg', slug: 'algebra', page: 2, created_at: '2024-06-02T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    // Click Page header → asc
+    const pageHeader = screen.getAllByRole('columnheader').find((el) => el.textContent?.startsWith('Page'))!
+    fireEvent.click(pageHeader)
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Low pg')
+    expect(rows[1]).toHaveTextContent('High pg')
+
+    // Click again → desc
+    fireEvent.click(pageHeader)
+    rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('High pg')
+    expect(rows[1]).toHaveTextContent('Low pg')
+  })
+
   it('context menu is scrollable with max-height', () => {
     stubTagDefs.defs = Array.from({ length: 20 }, (_, i) => ({ name: `tag-${i}`, color: '#268bd2' }))
     renderPage()
@@ -603,6 +649,26 @@ describe('SnipsPage', () => {
     expect(screen.getByText('Both')).toBeInTheDocument()
     expect(screen.queryByText('Only A')).not.toBeInTheDocument()
     expect(screen.queryByText('Only T')).not.toBeInTheDocument()
+  })
+
+  it('batch tags are OR-ed: snips matching any selected batch tag pass', () => {
+    const snips = [
+      makeSnip({ id: 's1', label: 'In B1', tags: ['algebra', 'Batch 1'], created_at: '2024-06-01T00:00:00Z' }),
+      makeSnip({ id: 's2', label: 'In B2', tags: ['algebra', 'Batch 2'], created_at: '2024-06-02T00:00:00Z' }),
+      makeSnip({ id: 's3', label: 'No batch', tags: ['algebra'], created_at: '2024-06-03T00:00:00Z' }),
+    ]
+    renderPage(snips)
+
+    fireEvent.click(screen.getByText('All tags'))
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    fireEvent.click(within(dropdown as HTMLElement).getByText('algebra'))
+    fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 1'))
+    fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 2'))
+
+    // algebra (AND) + Batch 1 OR Batch 2 → both batch snips shown, non-batch excluded
+    expect(screen.getByText('In B1')).toBeInTheDocument()
+    expect(screen.getByText('In B2')).toBeInTheDocument()
+    expect(screen.queryByText('No batch')).not.toBeInTheDocument()
   })
 
   it('filter state persists to localStorage', () => {

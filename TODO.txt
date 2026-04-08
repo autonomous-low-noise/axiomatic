@@ -4,7 +4,7 @@
 - [DONE] partial selector should first deselect
 - [DONE] snip table should show item count
 - jump from snip to pdf page
-- subsequent batch tags should be OR-ed (exception for tags starting with Batch; or handle it in better way)
+- [DONE] subsequent batch tags should be OR-ed (exception for tags starting with Batch; or handle it in better way)
 - shuffle button bad UX
 - [DONE] snip table state should persist across app restarts
 - sharper thumbnails in overview page
@@ -22,7 +22,7 @@
 	- tests. lot's of tests
 	- refactor: strategy pattern?
 	- consolidation iteration
-- snip table view should also sort based on source
+- [DONE] snip table view should also sort based on source
 - no "mark pdf as marked" and "mark snip as solid" and no UI for
 	- progress bar how many pdfs are marked per dir
 	- progress bar how many snips are solidified per pdf
