@@ -911,7 +911,9 @@ pub fn migrate_slug_inner(
                     if let Some(val) = map.remove(old_slug) {
                         map.insert(new_slug.to_string(), val);
                         if let Ok(json) = serde_json::to_string_pretty(&map) {
-                            std::fs::write(&path, json).ok();
+                            if let Err(e) = std::fs::write(&path, json) {
+                                log::warn!("migrate_slug: failed to write {}: {}", path.display(), e);
+                            }
                         }
                     }
                 }
@@ -921,6 +923,7 @@ pub fn migrate_slug_inner(
         rename_key("progress.json");
         rename_key("starred.json");
         rename_key("xp.json");
+        rename_key("book-status.json");
         rename_key("pomodoro-xp.json");
 
         // snips.json — update slug field in array items
@@ -933,7 +936,9 @@ pub fn migrate_slug_inner(
                     }
                 }
                 if let Ok(json) = serde_json::to_string_pretty(&arr) {
-                    std::fs::write(&snips_path, json).ok();
+                    if let Err(e) = std::fs::write(&snips_path, json) {
+                        log::warn!("migrate_slug: failed to write {}: {}", snips_path.display(), e);
+                    }
                 }
             }
         }
@@ -952,7 +957,9 @@ pub fn migrate_slug_inner(
                     }
                 }
                 if let Ok(json) = serde_json::to_string_pretty(&arr) {
-                    std::fs::write(&sessions_path, json).ok();
+                    if let Err(e) = std::fs::write(&sessions_path, json) {
+                        log::warn!("migrate_slug: failed to write {}: {}", sessions_path.display(), e);
+                    }
                 }
             }
         }
