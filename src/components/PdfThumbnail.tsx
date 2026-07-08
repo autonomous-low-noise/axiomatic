@@ -58,16 +58,16 @@ export const PdfThumbnail = memo(function PdfThumbnail({ fullPath }: Props) {
 
   if (!visible || !cached) {
     return (
-      <div ref={sentinelRef} className="relative aspect-[3/4] w-full overflow-hidden rounded bg-[#eee8d5] dark:bg-[#073642]">
+      <div ref={sentinelRef} className="relative aspect-[3/4] w-full overflow-hidden rounded bg-base2 dark:bg-base02">
         {visible && (
-          <div className="absolute inset-0 animate-pulse bg-[#93a1a1]/20 dark:bg-[#586e75]/20" />
+          <div className="absolute inset-0 animate-pulse bg-base1/20 dark:bg-base01/20" />
         )}
       </div>
     )
   }
 
   return (
-    <div ref={sentinelRef} className="relative aspect-[3/4] w-full overflow-hidden rounded bg-[#eee8d5] dark:bg-[#073642]">
+    <div ref={sentinelRef} className="relative aspect-[3/4] w-full overflow-hidden rounded bg-base2 dark:bg-base02">
       <img
         src={buildPdfiumUrl({ path: fullPath, page: 1, width: 200, dpr: 1 }, getPlatformInfo().os)}
         alt=""

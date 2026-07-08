@@ -103,12 +103,15 @@ Three-tier storage:
 
 ## Roadmap
 
+- [ ] "indexes" / maps per doc
+- [ ] dual view - two pages at the same time
+
+- [ ] claude-mcp-bridge integration
 - [ ] Tab drag-and-drop reorder
 - [ ] Display tags in mixed-course carousel snips
 - [ ] Web / iOS / Windows build targets
 - [ ] Live-watch for filesystem changes
 - [ ] Export (notes, vault, annotated PDFs)
-- [ ] A2A protocol for Claude Code integration
 
 ## Changelog
 

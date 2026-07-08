@@ -6,6 +6,7 @@ import { NotesPanel } from './NotesPanel'
 import { ZoomableSnipImage } from './ZoomableSnipImage'
 import { useSwipe } from '../hooks/useSwipe'
 import { usePlatform } from '../lib/platform'
+import { Button } from './ui/Button'
 
 interface LoopCarouselProps {
   snips: Snip[]
@@ -233,18 +234,18 @@ export function LoopCarousel({
 
   if (!current) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
-        <p className="text-[#657b83] dark:text-[#93a1a1]">No snips to review.</p>
+      <div className="flex flex-1 items-center justify-center bg-base3 dark:bg-base03">
+        <p className="text-base00 dark:text-base1">No snips to review.</p>
       </div>
     )
   }
 
   return (
     <div className="flex flex-1">
-      <div ref={cardAreaRef} className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto bg-[#fdf6e3] p-4 sm:justify-center sm:gap-6 sm:p-8 dark:bg-[#002b36]">
+      <div ref={cardAreaRef} className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto bg-base3 p-4 sm:justify-center sm:gap-6 sm:p-8 dark:bg-base03">
         {/* Header */}
         <div className="flex w-full max-w-full items-center justify-between sm:max-w-2xl">
-          <span className="text-sm text-[#93a1a1] dark:text-[#586e75]">
+          <span className="text-sm text-base1 dark:text-base01">
             {index + 1} / {orderedSnips.length}
           </span>
           <div className="flex items-center gap-3">
@@ -254,22 +255,23 @@ export function LoopCarousel({
                 aria-label="Toggle shuffle"
                 className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
                   isShuffled
-                    ? 'border-[#268bd2]/50 bg-[#268bd2]/10 text-[#268bd2]'
-                    : 'border-[#93a1a1]/30 text-[#93a1a1] hover:border-[#268bd2]/50 hover:text-[#268bd2] dark:text-[#586e75]'
+                    ? 'border-blue/50 bg-blue/10 text-blue'
+                    : 'border-base1/30 text-base1 hover:border-blue/50 hover:text-blue dark:text-base01'
                 }`}
               >
                 {isShuffled ? 'Shuffled' : 'Sorted'}
               </button>
             )}
             {!viewMode && !noXp && !onIncrementXpForSnip && (
-              <span className="text-sm font-medium text-[#b58900]">
+              <span className="text-sm font-medium text-yellow">
                 {displayXp} XP
               </span>
             )}
           </div>
-          <button
+          <Button
+            variant="ghost"
             onClick={onExit}
-            className="min-h-[44px] min-w-[44px] text-sm text-[#93a1a1] hover:text-[#657b83] dark:text-[#586e75] dark:hover:text-[#93a1a1]"
+            className="min-h-[44px] min-w-[44px]"
             aria-label="Exit carousel"
           >
             {platform.isMobile ? (
@@ -280,11 +282,11 @@ export function LoopCarousel({
             ) : (
               'ESC to exit'
             )}
-          </button>
+          </Button>
         </div>
 
         {/* Card */}
-        <div className={`flex w-full flex-col items-center gap-4 overflow-hidden rounded-lg border border-[#eee8d5] bg-white p-4 shadow-sm sm:p-8 dark:border-[#073642] dark:bg-[#073642] ${revealed ? 'max-w-full' : 'max-w-full sm:max-w-2xl'}`}>
+        <div className={`flex w-full flex-col items-center gap-4 overflow-hidden rounded-lg border border-base2 bg-white p-4 shadow-sm sm:p-8 dark:border-base02 dark:bg-base02 ${revealed ? 'max-w-full' : 'max-w-full sm:max-w-2xl'}`}>
           {renaming ? (
             <input
               ref={renameInputRef}
@@ -296,11 +298,11 @@ export function LoopCarousel({
                 e.stopPropagation()
               }}
               onBlur={commitRename}
-              className="w-full max-w-md rounded border border-[#268bd2] bg-transparent text-center text-2xl font-semibold text-[#657b83] outline-none dark:text-[#93a1a1]"
+              className="w-full max-w-md rounded border border-blue bg-transparent text-center text-2xl font-semibold text-base00 outline-none dark:text-base1"
             />
           ) : (
             <h2
-              className="text-center text-2xl font-semibold text-[#657b83] dark:text-[#93a1a1]"
+              className="text-center text-2xl font-semibold text-base00 dark:text-base1"
               onDoubleClick={onRename ? startRename : undefined}
             >
               {current.label}
@@ -309,13 +311,13 @@ export function LoopCarousel({
           {onNavigateToSnip ? (
             <button
               onClick={() => onNavigateToSnip(current)}
-              className="text-sm text-[#268bd2] hover:underline"
+              className="text-sm text-blue hover:underline"
               aria-label="Open in reader"
             >
               p. {current.page} — open in reader (o)
             </button>
           ) : (
-            <p className="text-sm text-[#93a1a1] dark:text-[#586e75]">
+            <p className="text-sm text-base1 dark:text-base01">
               p. {current.page}
             </p>
           )}
@@ -323,21 +325,24 @@ export function LoopCarousel({
           {revealed ? (
             <ZoomableSnipImage snip={current} maxHeight="60vh" globalShortcuts pathMap={pathMap} dirPath={dirPath} />
           ) : (
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               onClick={handleReveal}
-              className="mt-4 rounded-lg bg-[#268bd2] px-8 py-3 text-lg text-white transition-colors hover:bg-[#268bd2]/90"
+              className="mt-4 px-8 py-3 text-lg"
             >
               Reveal
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Navigation */}
         <div className="flex gap-4">
-          <button
+          <Button
+            variant="icon"
             onClick={handlePrev}
             aria-label="Previous"
-            className="min-h-[44px] min-w-[44px] rounded px-4 py-2 text-sm text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="min-h-[44px] min-w-[44px] px-4 py-2 text-sm"
           >
             {platform.isMobile ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -346,11 +351,12 @@ export function LoopCarousel({
             ) : (
               'Prev (k)'
             )}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="icon"
             onClick={handleNext}
             aria-label="Next"
-            className="min-h-[44px] min-w-[44px] rounded px-4 py-2 text-sm text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="min-h-[44px] min-w-[44px] px-4 py-2 text-sm"
           >
             {platform.isMobile ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -359,7 +365,7 @@ export function LoopCarousel({
             ) : (
               'Next (j)'
             )}
-          </button>
+          </Button>
         </div>
       </div>
 

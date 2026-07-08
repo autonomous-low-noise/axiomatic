@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import type { EditorView } from '@codemirror/view'
@@ -12,6 +11,14 @@ import type { SnipWithDir } from '../hooks/useSnips'
 import { useSnipTagDefs } from '../hooks/useSnipTagDefs'
 import { useNotes, useNoteContent } from '../hooks/useNotes'
 import { togglePalette } from '../lib/palette'
+import { sol } from '../lib/solarized'
+import { TAG_PALETTE } from '../lib/tagPalette'
+import { cx } from '../lib/cx'
+import { Z } from '../lib/zIndex'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Badge } from '../components/ui/Badge'
+import { Menu } from '../components/ui/Menu'
 import { LoopCarousel } from '../components/LoopCarousel'
 import { NotesPanel } from '../components/NotesPanel'
 import { PomodoroTimer } from '../components/PomodoroTimer'
@@ -153,7 +160,7 @@ export function SnipsPage() {
 
   const searchRef = useRef<HTMLInputElement>(null)
   const tableRef = useRef<HTMLDivElement>(null)
-  const tagDropdownRef = useRef<HTMLDivElement>(null)
+  const tagFilterBtnRef = useRef<HTMLButtonElement>(null)
   const tagManagerBtnRef = useRef<HTMLButtonElement>(null)
   const editorRef = useRef<EditorView | null>(null)
 
@@ -337,19 +344,6 @@ export function SnipsPage() {
     row?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex])
 
-  // Close tag dropdown on click outside
-  useEffect(() => {
-    if (!tagDropdownOpen) return
-    const handleClick = (e: MouseEvent) => {
-      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
-        setTagDropdownOpen(false)
-        setTagSearch('')
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [tagDropdownOpen])
-
   const toggleTagFilter = useCallback((tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
@@ -444,33 +438,34 @@ export function SnipsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
-        <p className="text-[#657b83] dark:text-[#93a1a1]">Loading snips...</p>
+      <div className="flex flex-1 items-center justify-center bg-base3 dark:bg-base03">
+        <p className="text-base00 dark:text-base1">Loading snips...</p>
       </div>
     )
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-base3 dark:bg-base03">
       {/* Toolbar */}
-      <div className="flex h-10 shrink-0 flex-wrap items-center gap-1 border-b border-[#eee8d5] bg-[#fdf6e3] px-2 dark:border-[#073642] dark:bg-[#002b36]">
-        <button
+      <div className="flex h-10 shrink-0 flex-wrap items-center gap-1 border-b border-base2 bg-base3 px-2 dark:border-base02 dark:bg-base03">
+        <Button
+          variant="icon"
           onClick={() => navigate('/')}
-          className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="shrink-0"
           aria-label="Back to library"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-        </button>
+        </Button>
 
-        <h1 className="shrink-0 text-sm font-medium text-[#586e75] dark:text-[#93a1a1]">Snips</h1>
+        <h1 className="shrink-0 text-sm font-medium text-base01 dark:text-base1">Snips</h1>
 
         <select
           value={dirFilter}
           onChange={(e) => setDirFilter(e.target.value)}
-          className="h-7 rounded border border-[#93a1a1]/30 bg-[#fdf6e3] px-2 text-xs text-[#586e75] outline-none focus:border-[#268bd2] dark:border-[#073642] dark:bg-[#073642] dark:text-[#93a1a1] dark:focus:border-[#268bd2]"
+          className="h-7 rounded border border-base1/30 bg-base3 px-2 text-xs text-base01 outline-none focus:border-blue dark:border-base02 dark:bg-base02 dark:text-base1 dark:focus:border-blue"
         >
           <option value="all">All directories</option>
           {directories.map((dir) => (
@@ -479,122 +474,137 @@ export function SnipsPage() {
         </select>
 
         {/* Tag filter dropdown with colored pills */}
-        <div ref={tagDropdownRef} className="relative">
-          <button
-            onClick={() => setTagDropdownOpen((v) => !v)}
-            className="flex h-7 items-center gap-1 rounded border border-[#93a1a1]/30 bg-[#fdf6e3] px-2 text-xs text-[#586e75] outline-none hover:border-[#268bd2] dark:border-[#073642] dark:bg-[#073642] dark:text-[#93a1a1] dark:hover:border-[#268bd2]"
+        <Button
+          ref={tagFilterBtnRef}
+          variant="secondary"
+          size="sm"
+          onClick={() => setTagDropdownOpen((v) => !v)}
+          className="h-7 shrink-0"
+        >
+          {selectedTags.length === 0
+            ? 'All tags'
+            : `${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}`}
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </Button>
+        {tagDropdownOpen && uniqueTags.length > 0 && (
+          <Menu
+            anchorRef={tagFilterBtnRef}
+            onClose={() => { setTagDropdownOpen(false); setTagSearch('') }}
+            className="w-48 sm:w-56"
           >
-            {selectedTags.length === 0
-              ? 'All tags'
-              : `${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}`}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-          {tagDropdownOpen && uniqueTags.length > 0 && (
-            <div className="absolute left-0 top-8 z-30 w-48 rounded-md border border-[#eee8d5] bg-[#fdf6e3] py-1 shadow-lg sm:w-56 dark:border-[#073642] dark:bg-[#073642]">
-              <div className="px-2 pb-1">
-                <input
-                  type="text"
-                  value={tagSearch}
-                  onChange={(e) => setTagSearch(e.target.value)}
-                  placeholder="Search tags..."
-                  className="h-6 w-full rounded border border-[#93a1a1]/30 bg-transparent px-2 text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </div>
-              {selectedTags.length > 0 && (
-                <button
-                  onClick={() => setSelectedTags([])}
-                  className="block w-full px-3 py-1 text-left text-xs text-[#268bd2] hover:bg-[#eee8d5] dark:hover:bg-[#002b36]"
-                >
-                  Clear all
-                </button>
-              )}
-              <div className="max-h-40 overflow-y-auto">
-                {uniqueTags
-                  .filter((tag) => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
-                  .map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTagFilter(tag)}
-                    className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#002b36]"
-                  >
-                    <span className={`inline-block h-3 w-3 shrink-0 rounded-sm border ${
-                      selectedTags.includes(tag)
-                        ? 'border-[#268bd2] bg-[#268bd2]'
-                        : 'border-[#93a1a1]/50 bg-transparent'
-                    }`} />
-                    {tagColorMap.has(tag) && (
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: tagColorMap.get(tag) }} />
-                    )}
-                    {tag}
-                  </button>
-                ))}
-              </div>
+            <div className="px-2 pb-1">
+              <Input
+                type="text"
+                inputSize="sm"
+                surface="panel"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                placeholder="Search tags..."
+                className="w-full"
+                onKeyDown={(e) => e.stopPropagation()}
+              />
             </div>
-          )}
-        </div>
+            {selectedTags.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedTags([])}
+                className="block w-full px-3 py-1 text-left text-xs text-blue hover:bg-base2 dark:hover:bg-base03"
+              >
+                Clear all
+              </button>
+            )}
+            <div className="max-h-40 overflow-y-auto">
+              {uniqueTags
+                .filter((tag) => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                .map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTagFilter(tag)}
+                  className="flex w-full items-center gap-2 px-3 py-1 text-left text-xs text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
+                >
+                  <span className={`inline-block h-3 w-3 shrink-0 rounded-sm border ${
+                    selectedTags.includes(tag)
+                      ? 'border-blue bg-blue'
+                      : 'border-base1/50 bg-transparent'
+                  }`} />
+                  {tagColorMap.has(tag) && (
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: tagColorMap.get(tag) }} />
+                  )}
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </Menu>
+        )}
 
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => setLoopOpen(true)}
           disabled={filteredSnips.length === 0}
-          className="h-7 shrink-0 rounded border border-[#268bd2]/50 bg-[#268bd2]/10 px-3 text-xs font-medium text-[#268bd2] transition-colors hover:bg-[#268bd2]/20 disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#268bd2]/30 dark:bg-[#268bd2]/10 dark:hover:bg-[#268bd2]/20"
+          className="h-7 shrink-0"
         >
           Loop
-        </button>
+        </Button>
 
         {/* Tag manager button */}
-        <button
+        <Button
           ref={tagManagerBtnRef}
+          variant="secondary"
+          size="sm"
           onClick={() => setTagManagerOpen((v) => !v)}
-          className="h-7 shrink-0 rounded border border-[#93a1a1]/30 bg-[#fdf6e3] px-2 text-xs text-[#586e75] hover:border-[#268bd2] dark:border-[#073642] dark:bg-[#073642] dark:text-[#93a1a1] dark:hover:border-[#268bd2]"
+          className="h-7 shrink-0"
         >
           Manage tags
-        </button>
+        </Button>
 
         {/* Select mode toggle */}
-        <button
+        <Button
+          variant="icon"
+          active={selectMode}
           onClick={() => { setSelectMode((v) => !v); if (selectMode) setSelectedIds(new Set()) }}
           aria-label="Toggle select mode"
-          className={`h-7 shrink-0 rounded border px-2 text-xs ${
-            selectMode
-              ? 'border-[#268bd2] bg-[#268bd2]/10 text-[#268bd2] dark:border-[#268bd2]/50'
-              : 'border-[#93a1a1]/30 bg-[#fdf6e3] text-[#586e75] hover:border-[#268bd2] dark:border-[#073642] dark:bg-[#073642] dark:text-[#93a1a1] dark:hover:border-[#268bd2]'
-          }`}
+          className="shrink-0"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 11 12 14 22 4" />
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
-        </button>
+        </Button>
 
         {/* Selection toolbar */}
         {selectMode && selectedIds.size > 0 && (
           <>
-            <div className="mx-1 h-4 w-px bg-[#93a1a1]/30 dark:bg-[#073642]" />
-            <span className="text-xs text-[#586e75] dark:text-[#93a1a1]">
+            <div className="mx-1 h-4 w-px bg-base1/30 dark:bg-base02" />
+            <span className="text-xs text-base01 dark:text-base1">
               {selectedIds.size} selected
             </span>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setTagAssignerOpen(true)}
-              className="h-7 shrink-0 rounded border border-[#859900]/50 bg-[#859900]/10 px-2 text-xs text-[#859900] hover:bg-[#859900]/20 dark:border-[#859900]/30"
+              className="h-7 shrink-0"
             >
               Tag
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
               onClick={handleDeleteSelected}
-              className="h-7 shrink-0 rounded border border-[#dc322f]/50 bg-[#dc322f]/10 px-2 text-xs text-[#dc322f] hover:bg-[#dc322f]/20 dark:border-[#dc322f]/30"
+              className="h-7 shrink-0"
             >
               Delete
-            </button>
+            </Button>
           </>
         )}
 
         <div className="flex-1" />
 
         <div className="relative flex shrink-0 items-center">
-          <input
+          <Input
             ref={searchRef}
             type="text"
             value={search}
@@ -608,38 +618,41 @@ export function SnipsPage() {
               }
             }}
             placeholder="Search snips... (/)"
-            className="h-7 w-28 rounded border border-[#93a1a1]/30 bg-[#fdf6e3] pl-2 pr-7 text-sm text-[#073642] outline-none focus:border-[#268bd2] sm:w-52 dark:border-[#073642] dark:bg-[#073642] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
+            className="w-28 pr-7 sm:w-52"
           />
           {search && (
-            <button
+            <Button
+              variant="icon"
+              size="sm"
               onClick={() => { setSearch(''); searchRef.current?.focus() }}
-              className="absolute right-1.5 text-[#93a1a1] hover:text-[#586e75] dark:hover:text-[#93a1a1]"
+              className="absolute right-0.5"
               aria-label="Clear search"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
-            </button>
+            </Button>
           )}
         </div>
 
-        <button
+        <Button
+          variant="icon"
           onClick={togglePalette}
-          className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="shrink-0"
           aria-label="Command palette"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       {/* Table + Notes */}
       <div className="flex min-h-0 flex-1">
       <div ref={tableRef} className="min-h-0 flex-1 overflow-y-auto">
         {filteredSnips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-[#93a1a1] dark:text-[#657b83]">
+          <div className="flex flex-col items-center justify-center py-20 text-base1 dark:text-base00">
             <p className="text-sm">
               {snips.length === 0
                 ? 'No snips yet. Open a book and use the snip tool to capture regions.'
@@ -648,7 +661,7 @@ export function SnipsPage() {
           </div>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#eee8d5] text-xs font-medium uppercase tracking-wider text-[#93a1a1] dark:bg-[#073642] dark:text-[#586e75]">
+            <thead className={`sticky top-0 ${Z.raised} bg-base2 text-xs font-medium uppercase tracking-wider text-base1 dark:bg-base02 dark:text-base01`}>
               <tr>
                 {selectMode && (
                   <th className="w-8 px-2 py-2">
@@ -659,7 +672,7 @@ export function SnipsPage() {
                         if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredSnips.length
                       }}
                       onChange={selectAll}
-                      className="h-4 w-4 accent-[#268bd2]"
+                      className="h-4 w-4 accent-blue"
                     />
                   </th>
                 )}
@@ -715,12 +728,12 @@ export function SnipsPage() {
                       toggleSelect(snip.id, e.shiftKey)
                     }}
                     onContextMenu={(e) => handleContextMenu(e, snip)}
-                    className={`border-b border-[#eee8d5] select-none dark:border-[#073642] ${
+                    className={`border-b border-base2 select-none dark:border-base02 ${
                       i === selectedIndex
-                        ? 'bg-[#eee8d5] dark:bg-[#073642]'
+                        ? 'bg-base2 dark:bg-base02'
                         : isSelected
-                          ? 'bg-[#eee8d5]/70 dark:bg-[#073642]/70'
-                          : 'hover:bg-[#eee8d5]/50 dark:hover:bg-[#073642]/50'
+                          ? 'bg-base2/70 dark:bg-base02/70'
+                          : 'hover:bg-base2/50 dark:hover:bg-base02/50'
                     }`}
                   >
                     {selectMode && (
@@ -729,19 +742,19 @@ export function SnipsPage() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => toggleSelect(snip.id, e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey)}
-                        className="h-4 w-4 accent-[#268bd2]"
+                        className="h-4 w-4 accent-blue"
                       />
                     </td>
                     )}
                     <td
-                      className="px-4 py-2 text-[#073642] dark:text-[#eee8d5]"
+                      className="px-4 py-2 text-base02 dark:text-base2"
                       onDoubleClick={(e) => {
                         e.stopPropagation()
                         startRename(snip)
                       }}
                     >
                       {renamingId === snip.id ? (
-                        <input
+                        <Input
                           autoFocus
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
@@ -752,86 +765,94 @@ export function SnipsPage() {
                             e.stopPropagation()
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full rounded border border-[#268bd2] bg-transparent px-1 text-sm outline-none"
+                          className="w-full"
                         />
                       ) : (
                         snip.label
                       )}
                     </td>
-                    <td className="max-w-[200px] truncate px-4 py-2 text-[#586e75] dark:text-[#93a1a1]">
+                    <td className="max-w-[200px] truncate px-4 py-2 text-base01 dark:text-base1">
                       {slugToTitle[snip.slug] ?? snip.slug}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-[#586e75] dark:text-[#93a1a1]">
+                    <td className="px-4 py-2 text-right tabular-nums text-base01 dark:text-base1">
                       {snip.page}
                     </td>
                     <td className="px-4 py-2">
                       {snip.tags.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {snip.tags.map((tag) => (
-                            <span
+                            <Badge
                               key={tag}
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
+                              variant="pill"
                               style={{
-                                backgroundColor: (tagColorMap.get(tag) ?? '#93a1a1') + '20',
-                                color: tagColorMap.get(tag) ?? '#586e75',
+                                backgroundColor: (tagColorMap.get(tag) ?? sol.base1) + '20',
+                                color: tagColorMap.get(tag) ?? sol.base01,
                               }}
                             >
                               <span
                                 className="inline-block h-1.5 w-1.5 rounded-full"
-                                style={{ backgroundColor: tagColorMap.get(tag) ?? '#93a1a1' }}
+                                style={{ backgroundColor: tagColorMap.get(tag) ?? sol.base1 }}
                               />
                               {tag}
-                            </span>
+                            </Badge>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[#93a1a1]/50 dark:text-[#586e75]/50">--</span>
+                        <span className="text-base1/50 dark:text-base01/50">--</span>
                       )}
                     </td>
                     <td className="px-4 py-2">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           const next = snip.status === 'open' ? 'solid' : snip.status === 'solid' ? 'attention' : 'open'
                           setSnipStatus(snip.dirPath, snip.id, next)
                         }}
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          snip.status === 'solid'
-                            ? 'bg-[#859900]/20 text-[#859900]'
-                            : snip.status === 'attention'
-                              ? 'bg-[#cb4b16]/20 text-[#cb4b16]'
-                              : 'bg-[#93a1a1]/20 text-[#93a1a1]'
-                        }`}
                       >
-                        {snip.status}
+                        <Badge
+                          variant="pill"
+                          className={cx(
+                            'cursor-pointer font-medium',
+                            snip.status === 'solid'
+                              ? 'bg-green/20 text-green'
+                              : snip.status === 'attention'
+                                ? 'bg-orange/20 text-orange'
+                                : 'bg-base1/20 text-base1',
+                          )}
+                        >
+                          {snip.status}
+                        </Badge>
                       </button>
                     </td>
-                    <td className="px-4 py-2 tabular-nums text-[#93a1a1] dark:text-[#586e75]">
+                    <td className="px-4 py-2 tabular-nums text-base1 dark:text-base01">
                       {snip.created_at.slice(0, 10)}
                     </td>
                   </tr>
                   {expandedIds.has(snip.id) && (
-                    <tr className="border-b border-[#eee8d5] bg-[#eee8d5]/30 dark:border-[#073642] dark:bg-[#073642]/30">
+                    <tr className="border-b border-base2 bg-base2/30 dark:border-base02 dark:bg-base02/30">
                       <td colSpan={selectMode ? 8 : 7} className="px-4 py-4">
                         <div className="flex gap-6">
                           <ZoomableSnipImage snip={snip} maxHeight="200px" pathMap={pathMap} dirPath={snip.dirPath} />
-                          <div className="flex flex-col gap-2 text-sm text-[#586e75] dark:text-[#93a1a1]">
+                          <div className="flex flex-col gap-2 text-sm text-base01 dark:text-base1">
                             <p><span className="font-medium">Source:</span> {slugToTitle[snip.slug] ?? snip.slug}</p>
                             <p><span className="font-medium">Page:</span> {snip.page}</p>
                             <p><span className="font-medium">Region:</span> ({(snip.x * 100).toFixed(0)}%, {(snip.y * 100).toFixed(0)}%) {(snip.width * 100).toFixed(0)}%×{(snip.height * 100).toFixed(0)}%</p>
                             <div className="mt-2 flex gap-2">
-                              <button
+                              <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={() => navigateToSnip(snip)}
-                                className="rounded border border-[#268bd2]/50 bg-[#268bd2]/10 px-3 py-1 text-xs text-[#268bd2] hover:bg-[#268bd2]/20"
                               >
                                 Go to page
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => setExpandedIds((prev) => { const next = new Set(prev); next.delete(snip.id); return next })}
-                                className="rounded border border-[#93a1a1]/30 px-3 py-1 text-xs text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
                               >
                                 Collapse
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -859,9 +880,8 @@ export function SnipsPage() {
 
       {/* Context menu */}
       {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
+        <SnipContextMenu
+          point={{ x: contextMenu.x, y: contextMenu.y }}
           snip={snips.find((s) => s.id === contextMenu.snip.id) ?? contextMenu.snip}
           tagDefs={tagDefs}
           onView={() => {
@@ -913,7 +933,7 @@ export function SnipsPage() {
             }
           }}
           onCreateTag={async (name) => {
-            const color = ['#dc322f', '#cb4b16', '#b58900', '#859900', '#2aa198', '#268bd2', '#6c71c4', '#d33682'][tagDefs.length % 8]
+            const color = TAG_PALETTE[tagDefs.length % 8]
             await handleCreateDef(name, color)
             // Also assign the tag to the snip(s)
             if (selectedIds.has(contextMenu.snip.id) && selectedIds.size > 1) {
@@ -970,8 +990,8 @@ export function SnipsPage() {
       )}
 
       {/* Footer */}
-      <div className="flex h-6 shrink-0 items-center border-t border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
-        <span className="text-[10px] text-[#93a1a1] dark:text-[#586e75]">
+      <div className="flex h-6 shrink-0 items-center border-t border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
+        <span className="text-[10px] text-base1 dark:text-base01">
           {filteredSnips.length} snip{filteredSnips.length !== 1 ? 's' : ''}
           {filteredSnips.length !== snips.length && ` of ${snips.length} total`}
           {' '}({filteredSnips.filter((s) => s.status === 'solid').length} solid
@@ -981,18 +1001,19 @@ export function SnipsPage() {
 
       {/* Loop overlay */}
       {loopOpen && (
-        <div className="absolute inset-0 z-40 flex flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-          <div className="flex shrink-0 items-center gap-2 border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
-            <button
+        <div className={`absolute inset-0 ${Z.overlay} flex flex-col bg-base3 dark:bg-base03`}>
+          <div className="flex shrink-0 items-center gap-2 border-b border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
+            <Button
+              variant="icon"
               onClick={() => setLoopOpen(false)}
-              className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              className="shrink-0"
               aria-label="Back to snips"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="19" y1="12" x2="5" y2="12" />
                 <polyline points="12 19 5 12 12 5" />
               </svg>
-            </button>
+            </Button>
             <div className="flex-1" />
             <PomodoroTimer zenMode={false} />
           </div>
@@ -1013,18 +1034,19 @@ export function SnipsPage() {
 
       {/* View carousel overlay */}
       {viewStartIndex !== null && (
-        <div className="absolute inset-0 z-40 flex flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-          <div className="flex shrink-0 items-center gap-2 border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
-            <button
+        <div className={`absolute inset-0 ${Z.overlay} flex flex-col bg-base3 dark:bg-base03`}>
+          <div className="flex shrink-0 items-center gap-2 border-b border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
+            <Button
+              variant="icon"
               onClick={() => setViewStartIndex(null)}
-              className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              className="shrink-0"
               aria-label="Back to snips"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="19" y1="12" x2="5" y2="12" />
                 <polyline points="12 19 5 12 12 5" />
               </svg>
-            </button>
+            </Button>
             <div className="flex-1" />
             <PomodoroTimer zenMode={false} />
           </div>
@@ -1046,13 +1068,33 @@ export function SnipsPage() {
   )
 }
 
-// Extracted context menu with tag checkboxes, rename, delete
-function ContextMenu({
-  x, y, snip, tagDefs, bulkSnips,
+// A single context-menu row: token colors, danger tint for destructive actions.
+function MenuRow({ danger, onClick, children }: {
+  danger?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-base2 dark:hover:bg-base03',
+        danger ? 'text-red' : 'text-base01 dark:text-base1',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Context menu with actions, tag checkboxes, create-tag input, and status
+// section. Positioning + dismiss lifecycle come from the canonical Menu.
+function SnipContextMenu({
+  point, snip, tagDefs, bulkSnips,
   onView, onExpand, onNavigate, onRename, onDelete, onAddTag, onRemoveTag, onCreateTag, onSetStatus, onClose,
 }: {
-  x: number
-  y: number
+  point: { x: number; y: number }
   snip: SnipWithDir
   tagDefs: { name: string; color: string }[]
   bulkSnips: SnipWithDir[] | null
@@ -1067,75 +1109,27 @@ function ContextMenu({
   onSetStatus: (status: 'open' | 'solid' | 'attention') => void
   onClose: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
   const [newTagName, setNewTagName] = useState('')
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
-
-  useLayoutEffect(() => {
-    if (!ref.current) return
-    const rect = ref.current.getBoundingClientRect()
-    setPos({
-      left: Math.max(4, Math.min(x, window.innerWidth - rect.width - 4)),
-      top: Math.max(4, Math.min(y, window.innerHeight - rect.height - 4)),
-    })
-  }, [x, y])
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [onClose])
-
   const snipTags = new Set(snip.tags)
 
-  return createPortal(
-    <div
-      ref={ref}
-      className="fixed z-50 max-h-[80vh] min-w-[180px] overflow-y-auto rounded-md border border-[#eee8d5] bg-[#fdf6e3] py-1 shadow-lg dark:border-[#073642] dark:bg-[#073642]"
-      style={pos ? { left: pos.left, top: pos.top } : { left: x, top: y, opacity: 0 }}
-    >
-      <button
-        onClick={onView}
-        className="block w-full px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#002b36]/50"
-      >
-        View
-      </button>
-      <button
-        onClick={onExpand}
-        className="block w-full px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#002b36]/50"
-      >
-        Expand
-      </button>
-      <button
-        onClick={onNavigate}
-        className="block w-full px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#002b36]/50"
-      >
-        Open in reader
-      </button>
-      <button
-        onClick={onRename}
-        className="block w-full px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#002b36]/50"
-      >
-        Rename
-      </button>
-      <button
-        onClick={onDelete}
-        className="block w-full px-3 py-1.5 text-left text-sm text-[#dc322f] hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
-      >
-        Delete
-      </button>
+  const actions: Array<{ label: string; action: () => void; danger?: boolean }> = [
+    { label: 'View', action: onView },
+    { label: 'Expand', action: onExpand },
+    { label: 'Open in reader', action: onNavigate },
+    { label: 'Rename', action: onRename },
+    { label: 'Delete', action: onDelete, danger: true },
+  ]
 
-      <div className="border-t border-[#eee8d5] py-1 dark:border-[#073642]">
-        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#93a1a1] dark:text-[#657b83]">
+  return (
+    <Menu point={point} onClose={onClose} className="max-h-[80vh] min-w-[180px] overflow-y-auto">
+      {actions.map(({ label, action, danger }) => (
+        <MenuRow key={label} danger={danger} onClick={action}>
+          {label}
+        </MenuRow>
+      ))}
+
+      <div className="border-t border-base2 py-1 dark:border-base02">
+        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-base1 dark:text-base00">
           {bulkSnips ? `Tag ${bulkSnips.length} snips` : 'Tags'}
         </p>
         {tagDefs.map((def) => {
@@ -1143,22 +1137,24 @@ function ContextMenu({
           return (
             <label
               key={def.name}
-              className="flex cursor-pointer items-center gap-2 px-3 py-1 hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
+              className="flex cursor-pointer items-center gap-2 px-3 py-1 hover:bg-base2 dark:hover:bg-base03"
             >
               <input
                 type="checkbox"
                 checked={assigned}
                 onChange={() => assigned ? onRemoveTag(def.name) : onAddTag(def.name)}
-                className="accent-[#268bd2]"
+                className="accent-blue"
               />
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: def.color }} />
-              <span className="text-sm text-[#586e75] dark:text-[#93a1a1]">{def.name}</span>
+              <span className="text-sm text-base01 dark:text-base1">{def.name}</span>
             </label>
           )
         })}
         <div className="px-3 pt-1">
-          <input
+          <Input
             type="text"
+            inputSize="sm"
+            surface="panel"
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             onKeyDown={(e) => {
@@ -1172,31 +1168,26 @@ function ContextMenu({
               if (e.key !== 'Escape') e.stopPropagation()
             }}
             placeholder="New tag…"
-            className="h-6 w-full rounded border border-[#93a1a1]/30 bg-transparent px-2 text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
+            className="w-full"
           />
         </div>
       </div>
 
-      <div className="border-t border-[#eee8d5] py-1 dark:border-[#073642]">
-        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[#93a1a1] dark:text-[#657b83]">
+      <div className="border-t border-base2 py-1 dark:border-base02">
+        <p className="px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-base1 dark:text-base00">
           {bulkSnips ? `Status (${bulkSnips.length})` : 'Status'}
         </p>
         {(['open', 'solid', 'attention'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => { onSetStatus(s); onClose() }}
-            className="flex w-full items-center gap-2 px-3 py-1 text-left text-sm hover:bg-[#eee8d5] dark:hover:bg-[#002b36]/50"
-          >
+          <MenuRow key={s} onClick={() => { onSetStatus(s); onClose() }}>
             <span className={`h-2 w-2 rounded-full ${
-              s === 'solid' ? 'bg-[#859900]' : s === 'attention' ? 'bg-[#cb4b16]' : 'bg-[#93a1a1]'
+              s === 'solid' ? 'bg-green' : s === 'attention' ? 'bg-orange' : 'bg-base1'
             }`} />
-            <span className={`${snip.status === s ? 'font-medium text-[#073642] dark:text-[#eee8d5]' : 'text-[#586e75] dark:text-[#93a1a1]'}`}>
+            <span className={`${snip.status === s ? 'font-medium text-base02 dark:text-base2' : 'text-base01 dark:text-base1'}`}>
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </span>
-          </button>
+          </MenuRow>
         ))}
       </div>
-    </div>,
-    document.body,
+    </Menu>
   )
 }

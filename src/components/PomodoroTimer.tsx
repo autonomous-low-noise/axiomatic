@@ -17,6 +17,9 @@ import {
   applyNewDuration,
 } from '../hooks/usePomodoroTimer'
 import { BreakOverlay } from './BreakOverlay'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
+import { Menu } from './ui/Menu'
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -36,9 +39,7 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [customWork, setCustomWork] = useState(String(config.workMinutes))
   const [customBreak, setCustomBreak] = useState(String(config.breakMinutes))
-  const popoverRef = useRef<HTMLDivElement>(null)
   const settingsBtnRef = useRef<HTMLButtonElement>(null)
-  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number }>({ top: 40, right: 8 })
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- intentional: sync derived state with config changes */
@@ -50,27 +51,6 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
   useEffect(() => {
     applyNewDuration(config.workMinutes)
   }, [config.workMinutes])
-
-  useEffect(() => {
-    if (!popoverOpen) return
-    const r = settingsBtnRef.current?.getBoundingClientRect()
-    if (r) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: compute position on popover open
-      setPopoverPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
-    }
-  }, [popoverOpen])
-
-  useEffect(() => {
-    if (!popoverOpen) return
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (popoverRef.current?.contains(target)) return
-      if (settingsBtnRef.current?.contains(target)) return
-      setPopoverOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [popoverOpen])
 
   const handlePresetChange = useCallback(
     (preset: PomodoroPreset) => {
@@ -100,21 +80,21 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
 
   const phaseColor =
     timer.phase === 'work'
-      ? 'text-[#859900] dark:text-[#859900]'
-      : 'text-[#268bd2] dark:text-[#268bd2]'
+      ? 'text-green dark:text-green'
+      : 'text-blue dark:text-blue'
 
   return (
     <>
       <div style={zenMode ? { display: 'none' } : undefined} className="flex items-center gap-1">
-        <div className="mx-0.5 h-4 w-px bg-[#eee8d5] dark:bg-[#073642]" />
+        <div className="mx-0.5 h-4 w-px bg-base2 dark:bg-base02" />
         {config.longBreakInterval > 0 && (
-          <span className="mr-0.5 text-xs tabular-nums text-[#93a1a1] dark:text-[#586e75]">
+          <span className="mr-0.5 text-xs tabular-nums text-base1 dark:text-base01">
             {timer.completedPomodoros}/{config.longBreakInterval}
           </span>
         )}
         <button
           onClick={toggleTimer}
-          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-sm tabular-nums hover:bg-[#eee8d5] dark:hover:bg-[#073642] ${phaseColor}`}
+          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-sm tabular-nums hover:bg-base2 dark:hover:bg-base02 ${phaseColor}`}
           aria-label={timer.running ? 'Pause timer' : 'Start timer'}
         >
           {timer.running ? (
@@ -134,92 +114,88 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
             </span>
           )}
         </button>
-        <div className="relative">
-          <button
-            ref={settingsBtnRef}
-            onClick={() => setPopoverOpen((o) => !o)}
-            className="shrink-0 rounded p-1 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
-            aria-label="Timer settings"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2h12M6 22h12M7 2v4l5 6-5 6v4M17 2v4l-5 6 5 6v4" />
-            </svg>
-          </button>
-        </div>
-        {popoverOpen && createPortal(
-          <div ref={popoverRef} className="fixed z-50 w-64 rounded-lg border border-[#eee8d5] bg-[#fdf6e3] p-3 shadow-lg dark:border-[#073642] dark:bg-[#002b36]" style={popoverPos}>
-            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#93a1a1] dark:text-[#657b83]">
+        <Button
+          ref={settingsBtnRef}
+          variant="icon"
+          size="sm"
+          onClick={() => setPopoverOpen((o) => !o)}
+          className="shrink-0"
+          aria-label="Timer settings"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2h12M6 22h12M7 2v4l5 6-5 6v4M17 2v4l-5 6 5 6v4" />
+          </svg>
+        </Button>
+        {popoverOpen && (
+          <Menu anchorRef={settingsBtnRef} onClose={() => setPopoverOpen(false)} className="w-64">
+            <div className="px-3 py-2">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-base1 dark:text-base00">
               Duration
             </div>
             <div className="mb-3 flex gap-1">
               {(['45/10', '60/10', '90/15'] as PomodoroPreset[]).map((p) => (
-                <button
+                <Button
                   key={p}
+                  variant={config.preset === p ? 'primary' : 'secondary'}
+                  size="sm"
                   onClick={() => handlePresetChange(p)}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    config.preset === p
-                      ? 'bg-[#268bd2] text-white'
-                      : 'bg-[#eee8d5] text-[#586e75] hover:bg-[#ddd6c1] dark:bg-[#073642] dark:text-[#93a1a1] dark:hover:bg-[#0a4052]'
-                  }`}
                 >
                   {p}
-                </button>
+                </Button>
               ))}
-              <button
+              <Button
+                variant={config.preset === 'custom' ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => handlePresetChange('custom')}
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  config.preset === 'custom'
-                    ? 'bg-[#268bd2] text-white'
-                    : 'bg-[#eee8d5] text-[#586e75] hover:bg-[#ddd6c1] dark:bg-[#073642] dark:text-[#93a1a1] dark:hover:bg-[#0a4052]'
-                }`}
               >
                 Custom
-              </button>
+              </Button>
             </div>
             {config.preset === 'custom' && (
               <div className="mb-3 flex items-center gap-2">
-                <label className="flex items-center gap-1 text-xs text-[#586e75] dark:text-[#93a1a1]">
+                <label className="flex items-center gap-1 text-xs text-base01 dark:text-base1">
                   <span>Work</span>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     max="120"
                     value={customWork}
                     onChange={(e) => setCustomWork(e.target.value)}
-                    className="h-6 w-12 rounded border border-[#93a1a1]/30 bg-transparent px-1 text-center text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5]"
+                    inputSize="sm"
+                    surface="panel"
+                    className="w-12 text-center"
                   />
                 </label>
-                <label className="flex items-center gap-1 text-xs text-[#586e75] dark:text-[#93a1a1]">
+                <label className="flex items-center gap-1 text-xs text-base01 dark:text-base1">
                   <span>Break</span>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     max="60"
                     value={customBreak}
                     onChange={(e) => setCustomBreak(e.target.value)}
-                    className="h-6 w-12 rounded border border-[#93a1a1]/30 bg-transparent px-1 text-center text-xs text-[#073642] outline-none focus:border-[#268bd2] dark:text-[#eee8d5]"
+                    inputSize="sm"
+                    surface="panel"
+                    className="w-12 text-center"
                   />
                 </label>
-                <button
-                  onClick={handleCustomApply}
-                  className="rounded bg-[#268bd2] px-2 py-0.5 text-xs text-white hover:bg-[#268bd2]/90"
-                >
+                <Button variant="primary" size="sm" onClick={handleCustomApply}>
                   Set
-                </button>
+                </Button>
               </div>
             )}
-            <div className="mb-2 border-t border-[#eee8d5] pt-2 dark:border-[#073642]">
-              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-[#93a1a1] dark:text-[#657b83]">
+            <div className="mb-2 border-t border-base2 pt-2 dark:border-base02">
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-base1 dark:text-base00">
                 Notifications
               </div>
-              <div className="flex cursor-pointer items-center justify-between text-xs text-[#586e75] dark:text-[#93a1a1]">
+              <div className="flex cursor-pointer items-center justify-between text-xs text-base01 dark:text-base1">
                 <span>Audio chime</span>
                 <button
                   onClick={handleToggleAudio}
                   className={`shrink-0 relative h-5 w-9 rounded-full transition-colors ${
                     config.audioEnabled
-                      ? 'bg-[#268bd2]'
-                      : 'bg-[#93a1a1]/30 dark:bg-[#586e75]/40'
+                      ? 'bg-blue'
+                      : 'bg-base1/30 dark:bg-base01/40'
                   }`}
                   role="switch"
                   aria-checked={config.audioEnabled}
@@ -232,27 +208,27 @@ export function PomodoroTimer({ zenMode, activeSlug, activeDirPath }: Props) {
                 </button>
               </div>
             </div>
-            <div className="border-t border-[#eee8d5] pt-2 dark:border-[#073642]">
-              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-[#93a1a1] dark:text-[#657b83]">
+            <div className="border-t border-base2 pt-2 dark:border-base02">
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-base1 dark:text-base00">
                 Timer
               </div>
               <div className="flex gap-1">
                 <button
                   onClick={skipPhase}
-                  className="flex-1 rounded px-2 py-1 text-xs text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                  className="flex-1 rounded px-2 py-1 text-xs text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
                 >
                   Skip
                 </button>
                 <button
                   onClick={resetTimer}
-                  className="flex-1 rounded px-2 py-1 text-xs text-[#dc322f] hover:bg-[#dc322f]/10"
+                  className="flex-1 rounded px-2 py-1 text-xs text-red hover:bg-red/10"
                 >
                   Reset
                 </button>
               </div>
             </div>
-          </div>,
-          document.body,
+            </div>
+          </Menu>
         )}
       </div>
       {timer.showOverlay &&

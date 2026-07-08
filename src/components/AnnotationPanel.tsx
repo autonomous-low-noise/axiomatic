@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Highlight } from '../hooks/useHighlights'
+import { Button } from './ui/Button'
 
 interface Props {
   items: Highlight[]
@@ -104,31 +105,31 @@ export function AnnotationPanel({
 
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ width }}>
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
-        <span className="text-xs font-medium text-[#586e75] dark:text-[#93a1a1]">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
+        <span className="text-xs font-medium text-base01 dark:text-base1">
           {title}
         </span>
-        <span className="text-xs tabular-nums text-[#93a1a1] dark:text-[#657b83]">
+        <span className="text-xs tabular-nums text-base1 dark:text-base00">
           {entries.length}
         </span>
       </div>
-      <div className="flex-1 overflow-y-auto bg-[#fdf6e3] dark:bg-[#002b36]">
+      <div className="flex-1 overflow-y-auto bg-base3 dark:bg-base03">
         {pageGroups.length === 0 && (
-          <p className="p-4 text-center text-xs text-[#93a1a1] dark:text-[#657b83]">
+          <p className="p-4 text-center text-xs text-base1 dark:text-base00">
             {empty}
           </p>
         )}
         {pageGroups.map((group) => (
           <div key={group.page}>
-            <div className="sticky top-0 border-b border-[#eee8d5] bg-[#fdf6e3]/90 px-3 py-1 backdrop-blur-sm dark:border-[#073642] dark:bg-[#002b36]/90">
-              <span className="text-xs font-medium text-[#93a1a1] dark:text-[#657b83]">
+            <div className="sticky top-0 border-b border-base2 bg-base3/90 px-3 py-1 backdrop-blur-sm dark:border-base02 dark:bg-base03/90">
+              <span className="text-xs font-medium text-base1 dark:text-base00">
                 Page {group.page}
               </span>
             </div>
             {group.items.map((entry) => (
               <div
                 key={entry.key}
-                className="group flex cursor-pointer items-start gap-2 border-b border-[#eee8d5]/50 px-3 py-2 hover:bg-[#eee8d5] dark:border-[#073642]/50 dark:hover:bg-[#073642]"
+                className="group flex cursor-pointer items-start gap-2 border-b border-base2/50 px-3 py-2 hover:bg-base2 dark:border-base02/50 dark:hover:bg-base02"
                 onClick={() => onNavigate(entry.page)}
               >
                 {variant === 'highlights' ? (
@@ -138,7 +139,7 @@ export function AnnotationPanel({
                   />
                 ) : (
                   <svg
-                    className="mt-0.5 shrink-0 text-[#93a1a1] dark:text-[#657b83]"
+                    className="mt-0.5 shrink-0 text-base1 dark:text-base00"
                     width="12"
                     height="12"
                     viewBox="0 0 24 24"
@@ -151,11 +152,13 @@ export function AnnotationPanel({
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                   </svg>
                 )}
-                <span className="mr-2 line-clamp-3 min-w-0 flex-1 overflow-hidden text-xs leading-relaxed text-[#586e75] dark:text-[#93a1a1]">
+                <span className="mr-2 line-clamp-3 min-w-0 flex-1 overflow-hidden text-xs leading-relaxed text-base01 dark:text-base1">
                   {entry.text || '(no text)'}
                 </span>
-                <button
-                  className="shrink-0 rounded p-1 text-[#93a1a1] opacity-0 hover:bg-[#eee8d5] hover:text-[#dc322f] group-hover:opacity-100 dark:text-[#657b83] dark:hover:bg-[#073642] dark:hover:text-[#dc322f]"
+                <Button
+                  variant="icon"
+                  size="sm"
+                  className="shrink-0 opacity-0 hover:text-red group-hover:opacity-100 dark:hover:text-red"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDelete(entry)
@@ -169,7 +172,7 @@ export function AnnotationPanel({
                     <path d="M14 11v6" />
                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                   </svg>
-                </button>
+                </Button>
               </div>
             ))}
           </div>

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
 
 interface SnipBannerProps {
   onSave: (label: string) => void
@@ -18,9 +20,9 @@ export function SnipBanner({ onSave, onCancel }: SnipBannerProps) {
   }, [label, onSave])
 
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-[#eee8d5] bg-[#eee8d5]/60 px-4 py-2 dark:border-[#073642] dark:bg-[#073642]/60">
-      <span className="text-sm text-[#657b83] dark:text-[#93a1a1]">Label:</span>
-      <input
+    <div className="flex shrink-0 items-center gap-3 border-b border-base2 bg-base2/60 px-4 py-2 dark:border-base02 dark:bg-base02/60">
+      <span className="text-sm text-base00 dark:text-base1">Label:</span>
+      <Input
         ref={inputRef}
         type="text"
         value={label}
@@ -30,21 +32,26 @@ export function SnipBanner({ onSave, onCancel }: SnipBannerProps) {
           if (e.key === 'Escape') { e.stopPropagation(); onCancel() }
         }}
         placeholder="e.g. Chain rule formula"
-        className="min-w-0 flex-1 rounded border border-[#93a1a1]/30 bg-[#fdf6e3] px-2 py-1 text-sm text-[#657b83] placeholder-[#93a1a1] outline-none focus:border-[#268bd2] dark:bg-[#002b36] dark:text-[#93a1a1] dark:placeholder-[#586e75]"
+        surface="panel"
+        className="min-w-0 flex-1"
       />
-      <button
+      <Button
+        variant="primary"
+        size="sm"
         onClick={handleSubmit}
         disabled={!label.trim()}
-        className="shrink-0 rounded bg-[#268bd2] px-3 py-1 text-sm text-white disabled:opacity-50"
+        className="shrink-0"
       >
         Save
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onCancel}
-        className="shrink-0 text-xs text-[#93a1a1] hover:text-[#657b83] dark:text-[#586e75] dark:hover:text-[#93a1a1]"
+        className="shrink-0"
       >
         Cancel
-      </button>
+      </Button>
     </div>
   )
 }

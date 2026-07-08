@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import type { BookProgress, BookStatus } from '../types/progress'
 import type { Tag } from '../hooks/useTags'
 import { PdfThumbnail } from './PdfThumbnail'
+import { Badge } from './ui/Badge'
+import { Z } from '../lib/zIndex'
 
 interface Props {
   slug: string
@@ -45,7 +47,7 @@ export const BookTile = memo(function BookTile({
     <Link
       ref={tileRef}
       to={`/read/${slug}`}
-      className={`group flex flex-col gap-2 rounded-lg p-2 hover:bg-[#eee8d5] dark:hover:bg-[#073642] ${selected ? 'ring-2 ring-[#268bd2] bg-[#268bd2]/10 dark:bg-[#268bd2]/20' : ''}`}
+      className={`group flex flex-col gap-2 rounded-lg p-2 hover:bg-base2 dark:hover:bg-base02 ${selected ? 'ring-2 ring-blue bg-blue/10 dark:bg-blue/20' : ''}`}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu?.(slug, e.clientX, e.clientY)
@@ -54,15 +56,15 @@ export const BookTile = memo(function BookTile({
       <div className="relative">
         <PdfThumbnail fullPath={fullPath} />
         {bookStatus && bookStatus !== 'open' && (
-          <span className={`absolute bottom-2 left-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-medium text-white ${
+          <Badge variant="square" className={`absolute bottom-2 left-2 ${Z.raised} text-white ${
             bookStatus === 'done'
-              ? 'bg-[#859900]/90'
+              ? 'bg-green/90'
               : bookStatus === 'need-revisit'
-                ? 'bg-[#cb4b16]/90'
-                : 'bg-[#268bd2]/90'
+                ? 'bg-orange/90'
+                : 'bg-blue/90'
           }`}>
             {bookStatus === 'done' ? 'done' : bookStatus === 'need-revisit' ? 'revisit' : 'reading'}
-          </span>
+          </Badge>
         )}
         {progressText && (
           <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-0.5 text-xs font-medium text-white">
@@ -92,23 +94,24 @@ export const BookTile = memo(function BookTile({
         {tags && tags.length > 0 && (
           <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-1.5 opacity-0 group-hover:opacity-100">
             {tags.slice(0, 3).map((t) => (
-              <span
+              <Badge
                 key={t.id}
-                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+                variant="square"
+                className="text-white"
                 style={{ backgroundColor: t.color }}
               >
                 {t.name}
-              </span>
+              </Badge>
             ))}
             {tags.length > 3 && (
-              <span className="rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              <Badge variant="square" className="bg-black/50 text-white">
                 +{tags.length - 3}
-              </span>
+              </Badge>
             )}
           </div>
         )}
       </div>
-      <span className="truncate text-sm font-medium text-[#073642] dark:text-[#eee8d5] dark:group-hover:text-[#fdf6e3]">
+      <span className="truncate text-sm font-medium text-base02 dark:text-base2 dark:group-hover:text-base3">
         {title}
       </span>
     </Link>

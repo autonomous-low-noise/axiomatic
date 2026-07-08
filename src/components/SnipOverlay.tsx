@@ -62,7 +62,7 @@ export function SnipOverlay({ pageNum, onRegion }: { pageNum: number; onRegion: 
     >
       {rect && (
         <div
-          className="pointer-events-none absolute border-2 border-dashed border-[#268bd2] bg-[#268bd2]/10"
+          className="pointer-events-none absolute border-2 border-dashed border-blue bg-blue/10"
           style={{
             left: `${rect.x * 100}%`,
             top: `${rect.y * 100}%`,

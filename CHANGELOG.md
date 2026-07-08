@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.0.13
+
+### Design system — tokens, primitives, behavior hooks
+
+The UI was hand-copied everywhere: 1,098 raw Solarized hex literals across 39 files, 105 hand-rolled buttons, 8 independent dropdown implementations, ~15 copies of ESC-to-close. This release quotients all of it through a three-layer design system. Net −312 lines while adding 90 tests.
+
+**Token layer**
+- `@theme` block in `src/index.css` is now the single source of color utilities (`bg-base03`…`text-blue`); the default Tailwind palette is removed from the build, so off-token classes like `bg-blue-100` no longer compile — enforcement by compiler, not convention
+- `src/lib/solarized.ts` — canonical named map for TS code (promoted out of the CodeMirror editor theme)
+- `src/lib/tagPalette.ts` — persisted tag colors deduped into one module
+- Raw hexes reduced 1,098 → 22, confined to data sites (solarized.ts, tagPalette.ts, persisted highlight colors)
+- Same-role color drift resolved: one focus blue (was 2), one delete red (was 4), one accent treatment
+
+**UI primitives** (`src/components/ui/`, all test-first)
+- `Button` (icon/primary/secondary/danger/ghost) — every button now has a focus-visible indicator (previously 1 of 105)
+- `Input` (page/panel surfaces), `Badge` (pill/square), `Panel`/`PanelHeader`
+- `Menu` — portal + viewport-clamped positioning + dismiss lifecycle + j/k/Enter nav; replaces all 8 dropdown/context-menu implementations (incl. the duplicate inline `ContextMenu` in SnipsPage)
+- `Modal` — scrim, ESC/scrim-click dismiss, and Tab focus trapping (previously absent app-wide)
+- `Drawer` — right slide-in panel (tag assigners)
+
+**Behavior hooks**
+- `useDismissable` — canonical ESC / click-outside / scroll dismiss (replaces ~15 hand-rolled copies)
+- `useAnchoredPosition` — anchor/point positioning with viewport clamping (replaces 3 divergent schemes, one of which never clamped)
+- `src/lib/zIndex.ts` — central z-scale (`Z.raised`/`drawer`/`overlay`/`modal`), no more literal `z-*` drift
+
+**Deduplication**
+- `TagManager`/`SnipTagManager` and `TagAssigner`/`SnipTagAssigner` clone pairs (~90% identical) collapsed onto shared `TagListEditor` / `TagCheckList`
+- New coverage written first for the previously untested assigners (16 tests)
+
+**E2E**
+- Fixed mock staleness: `@tauri-apps/api` v2.10+ requires `__TAURI_INTERNALS__.metadata` (suite went 0 → 9 passing); remaining 15 failures verified pre-existing against clean HEAD (documented in CLAUDE.md gotchas)
+
+Suite: 592 vitest (was 502) + 91 cargo, lint clean, behavior-preserving throughout (public props APIs unchanged; capability additions only — focus rings, focus trap, viewport clamping, ESC on surfaces that lacked it).
+
 ## v0.0.12
 
 ### Mark / solidify system (TODO 26-30)

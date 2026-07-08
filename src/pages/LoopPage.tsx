@@ -53,17 +53,17 @@ export function LoopPage() {
   if (!book) {
     if (loading) {
       return (
-        <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
-          <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
+        <div className="flex flex-1 items-center justify-center bg-base3 dark:bg-base03">
+          <p className="text-base00 dark:text-base1">Loading...</p>
         </div>
       )
     }
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[#657b83] dark:bg-[#002b36] dark:text-[#93a1a1]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-base00 dark:bg-base03 dark:text-base1">
         <p>Book not found.</p>
         <button
           onClick={() => navigate('/')}
-          className="text-sm text-[#268bd2] underline"
+          className="text-sm text-blue underline"
         >
           Go back
         </button>
@@ -82,7 +82,7 @@ export function LoopPage() {
         onCloseToLeft={closeTabsToLeftAndNavigate}
         onCloseToRight={closeTabsToRightAndNavigate}
       />
-      <div className="flex shrink-0 items-center justify-end border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+      <div className="flex shrink-0 items-center justify-end border-b border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
         <PomodoroTimer zenMode={false} activeSlug={slug} activeDirPath={book?.dir_path} />
       </div>
       <LoopCarousel

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Z } from '../lib/zIndex'
+import { Button } from './ui/Button'
 
 export interface Command {
   id: string
@@ -73,37 +75,39 @@ export function CommandPalette({ commands, onClose }: Props) {
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-50" onClick={onClose} />
+      <div className={`fixed inset-0 ${Z.modal}`} onClick={onClose} />
       {/* Palette */}
       <div
-        className="fixed top-16 left-1/2 z-50 w-[300px] -translate-x-1/2 rounded-lg border border-[#93a1a1]/30 bg-[#fdf6e3] shadow-lg dark:border-[#073642] dark:bg-[#002b36] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+        className={`fixed top-16 left-1/2 ${Z.modal} w-[300px] -translate-x-1/2 rounded-lg border border-base1/30 bg-base3 shadow-lg dark:border-base02 dark:bg-base03 dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]`}
         onKeyDown={handleKeyDown}
       >
         {/* Input */}
-        <div className="flex items-center border-b border-[#eee8d5] dark:border-[#073642]">
+        <div className="flex items-center border-b border-base2 dark:border-base02">
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command…"
-            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-[#073642] outline-none placeholder:text-[#93a1a1] dark:text-[#eee8d5] dark:placeholder:text-[#586e75]"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-base02 outline-none placeholder:text-base1 dark:text-base2 dark:placeholder:text-base01"
           />
-          <button
+          <Button
+            variant="icon"
+            size="lg"
             onClick={onClose}
-            className="shrink-0 p-2 text-[#93a1a1] hover:text-[#586e75] dark:hover:text-[#93a1a1]"
+            className="shrink-0"
             aria-label="Close"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-          </button>
+          </Button>
         </div>
         {/* Command list */}
         <div ref={listRef} className="max-h-[320px] overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <div className="px-3 py-2 text-sm text-[#93a1a1] dark:text-[#586e75]">
+            <div className="px-3 py-2 text-sm text-base1 dark:text-base01">
               No matching commands
             </div>
           )}
@@ -113,13 +117,13 @@ export function CommandPalette({ commands, onClose }: Props) {
               onClick={() => execute(i)}
               className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm ${
                 i === selected
-                  ? 'bg-[#eee8d5] text-[#073642] dark:bg-[#073642] dark:text-[#eee8d5]'
-                  : 'text-[#586e75] dark:text-[#93a1a1]'
+                  ? 'bg-base2 text-base02 dark:bg-base02 dark:text-base2'
+                  : 'text-base01 dark:text-base1'
               }`}
             >
               <span>{cmd.label}</span>
               {cmd.shortcut && (
-                <span className="ml-4 text-xs text-[#93a1a1] dark:text-[#586e75]">
+                <span className="ml-4 text-xs text-base1 dark:text-base01">
                   {cmd.shortcut}
                 </span>
               )}

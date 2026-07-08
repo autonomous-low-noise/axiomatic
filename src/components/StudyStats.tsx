@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { Panel } from './ui/Panel'
 
 interface StudySessionBook {
   slug: string
@@ -130,52 +131,52 @@ export function StudyStats({ dirPaths }: Props) {
 
   return (
     <section className="px-4 pt-4 pb-2">
-      <h2 className="mb-3 text-sm font-medium text-[#657b83] dark:text-[#93a1a1]">
+      <h2 className="mb-3 text-sm font-medium text-base00 dark:text-base1">
         Study Stats
       </h2>
 
       {!hasAnySessions ? (
-        <div className="rounded-lg border border-[#eee8d5] bg-[#eee8d5]/40 px-4 py-6 text-center dark:border-[#073642] dark:bg-[#073642]/40">
-          <p className="text-sm text-[#657b83] dark:text-[#93a1a1]">
+        <Panel className="px-4 py-6 text-center">
+          <p className="text-sm text-base00 dark:text-base1">
             No study sessions yet. Start a pomodoro timer while reading to track your progress!
           </p>
-          <div className="mt-3 flex justify-center gap-6 text-xs text-[#93a1a1] dark:text-[#586e75]">
+          <div className="mt-3 flex justify-center gap-6 text-xs text-base1 dark:text-base01">
             <span>0 min today</span>
             <span>0 pomodoros</span>
             <span>0 books</span>
           </div>
-        </div>
+        </Panel>
       ) : (
-        <div className="rounded-lg border border-[#eee8d5] bg-[#eee8d5]/40 px-4 py-3 dark:border-[#073642] dark:bg-[#073642]/40">
+        <Panel className="px-4 py-3">
           {/* Summary counters */}
           <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-5">
             <div>
-              <div className="text-xs text-[#93a1a1] dark:text-[#586e75]">Today</div>
-              <div className="text-lg font-semibold tabular-nums text-[#073642] dark:text-[#eee8d5]">
+              <div className="text-xs text-base1 dark:text-base01">Today</div>
+              <div className="text-lg font-semibold tabular-nums text-base02 dark:text-base2">
                 {formatMinutes(todayMinutes)}
               </div>
             </div>
             <div>
-              <div className="text-xs text-[#93a1a1] dark:text-[#586e75]">This week</div>
-              <div className="text-lg font-semibold tabular-nums text-[#073642] dark:text-[#eee8d5]">
+              <div className="text-xs text-base1 dark:text-base01">This week</div>
+              <div className="text-lg font-semibold tabular-nums text-base02 dark:text-base2">
                 {formatMinutes(weekMinutes)}
               </div>
             </div>
             <div>
-              <div className="text-xs text-[#93a1a1] dark:text-[#586e75]">Pomodoros today</div>
-              <div className="text-lg font-semibold tabular-nums text-[#073642] dark:text-[#eee8d5]">
+              <div className="text-xs text-base1 dark:text-base01">Pomodoros today</div>
+              <div className="text-lg font-semibold tabular-nums text-base02 dark:text-base2">
                 {todayPomodoros}
               </div>
             </div>
             <div>
-              <div className="text-xs text-[#93a1a1] dark:text-[#586e75]">Pomodoros this week</div>
-              <div className="text-lg font-semibold tabular-nums text-[#073642] dark:text-[#eee8d5]">
+              <div className="text-xs text-base1 dark:text-base01">Pomodoros this week</div>
+              <div className="text-lg font-semibold tabular-nums text-base02 dark:text-base2">
                 {weekPomodoros}
               </div>
             </div>
             <div>
-              <div className="text-xs text-[#93a1a1] dark:text-[#586e75]">Books this week</div>
-              <div className="text-lg font-semibold tabular-nums text-[#073642] dark:text-[#eee8d5]">
+              <div className="text-xs text-base1 dark:text-base01">Books this week</div>
+              <div className="text-lg font-semibold tabular-nums text-base02 dark:text-base2">
                 {weekBooks}
               </div>
             </div>
@@ -189,26 +190,26 @@ export function StudyStats({ dirPaths }: Props) {
               return (
                 <div key={bucket.dateKey} className="flex flex-1 flex-col items-center gap-1">
                   {bucket.minutes > 0 && (
-                    <span className="text-[10px] tabular-nums text-[#586e75] dark:text-[#93a1a1]">
+                    <span className="text-[10px] tabular-nums text-base01 dark:text-base1">
                       {bucket.minutes}m
                     </span>
                   )}
                   <div
                     className={`w-full rounded-sm ${
                       bucket.minutes > 0
-                        ? 'bg-[#859900] dark:bg-[#859900]'
-                        : 'bg-[#93a1a1]/20 dark:bg-[#586e75]/30'
+                        ? 'bg-green dark:bg-green'
+                        : 'bg-base1/20 dark:bg-base01/30'
                     }`}
                     style={{ height: barHeight }}
                   />
-                  <span className="text-[10px] text-[#93a1a1] dark:text-[#586e75]">
+                  <span className="text-[10px] text-base1 dark:text-base01">
                     {bucket.label}
                   </span>
                 </div>
               )
             })}
           </div>
-        </div>
+        </Panel>
       )}
     </section>
   )

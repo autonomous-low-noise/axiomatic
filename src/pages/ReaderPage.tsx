@@ -358,17 +358,17 @@ export function ReaderPage() {
   if (!book) {
     if (loading) {
       return (
-        <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
-          <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
+        <div className="flex flex-1 items-center justify-center bg-base3 dark:bg-base03">
+          <p className="text-base00 dark:text-base1">Loading...</p>
         </div>
       )
     }
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[#657b83] dark:bg-[#002b36] dark:text-[#93a1a1]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-base00 dark:bg-base03 dark:text-base1">
         <p>Book not found.</p>
         <button
           onClick={() => navigate('/')}
-          className="text-sm text-[#268bd2] underline dark:text-[#268bd2]"
+          className="text-sm text-blue underline dark:text-blue"
         >
           Go back
         </button>
@@ -378,20 +378,20 @@ export function ReaderPage() {
 
   if (docLoading || !docInfo || !progressLoaded) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-[#fdf6e3] dark:bg-[#002b36]">
-        <p className="text-[#657b83] dark:text-[#93a1a1]">Opening document...</p>
+      <div className="flex flex-1 items-center justify-center bg-base3 dark:bg-base03">
+        <p className="text-base00 dark:text-base1">Opening document...</p>
       </div>
     )
   }
 
   if (docError) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[#657b83] dark:bg-[#002b36] dark:text-[#93a1a1]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-base00 dark:bg-base03 dark:text-base1">
         <p>Failed to open document.</p>
-        <p className="text-xs text-[#dc322f]">{docError}</p>
+        <p className="text-xs text-red">{docError}</p>
         <button
           onClick={() => navigate('/')}
-          className="text-sm text-[#268bd2] underline dark:text-[#268bd2]"
+          className="text-sm text-blue underline dark:text-blue"
         >
           Go back
         </button>
@@ -446,7 +446,7 @@ export function ReaderPage() {
         {!zenMode && outlineOpen && (
           <>
             <div
-              className="shrink-0 overflow-hidden bg-[#fdf6e3] dark:bg-[#002b36]"
+              className="shrink-0 overflow-hidden bg-base3 dark:bg-base03"
               style={{ width: outlinePaneWidth }}
             >
               <OutlineSidebar
@@ -457,13 +457,13 @@ export function ReaderPage() {
               />
             </div>
             <div
-              className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
+              className="w-1.5 shrink-0 cursor-col-resize bg-base2 hover:bg-blue active:bg-blue dark:bg-base02 dark:hover:bg-blue dark:active:bg-blue"
               onMouseDown={handleOutlineResize}
             />
           </>
         )}
         <div
-          className={`relative flex min-w-0 flex-1 flex-col ${activePane === 'pdf' ? 'border-t-2 border-[#268bd2]' : 'border-t-2 border-[#eee8d5] dark:border-[#073642]'}`}
+          className={`relative flex min-w-0 flex-1 flex-col ${activePane === 'pdf' ? 'border-t-2 border-blue' : 'border-t-2 border-base2 dark:border-base02'}`}
           style={snipMode ? { boxShadow: 'inset 0 0 24px rgba(38, 139, 210, 0.15)' } : undefined}
         >
           {pendingSnip && (
@@ -490,7 +490,7 @@ export function ReaderPage() {
           />
           {snipToast && (
             <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center">
-              <div className="rounded-lg bg-[#073642] px-4 py-2 text-sm text-[#93a1a1] shadow-lg dark:bg-[#eee8d5] dark:text-[#586e75]">
+              <div className="rounded-lg bg-base02 px-4 py-2 text-sm text-base1 shadow-lg dark:bg-base2 dark:text-base01">
                 {snipToast}
               </div>
             </div>
@@ -499,10 +499,10 @@ export function ReaderPage() {
         {notesOpen && slug && (
           <>
             <div
-              className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
+              className="w-1.5 shrink-0 cursor-col-resize bg-base2 hover:bg-blue active:bg-blue dark:bg-base02 dark:hover:bg-blue dark:active:bg-blue"
               onMouseDown={handleNotesResize}
             />
-            <div className={`flex h-full min-h-0 flex-col ${activePane === 'notes' ? 'border-t-2 border-[#268bd2]' : 'border-t-2 border-[#eee8d5] dark:border-[#073642]'}`}>
+            <div className={`flex h-full min-h-0 flex-col ${activePane === 'notes' ? 'border-t-2 border-blue' : 'border-t-2 border-base2 dark:border-base02'}`}>
               <NotesPanel
                 slug={slug}
                 page={currentPage}
@@ -517,10 +517,10 @@ export function ReaderPage() {
         {!zenMode && bookmarksOpen && slug && (
           <>
             <div
-              className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
+              className="w-1.5 shrink-0 cursor-col-resize bg-base2 hover:bg-blue active:bg-blue dark:bg-base02 dark:hover:bg-blue dark:active:bg-blue"
               onMouseDown={handleBookmarksResize}
             />
-            <div className="flex h-full min-h-0 flex-col border-t-2 border-[#eee8d5] dark:border-[#073642]">
+            <div className="flex h-full min-h-0 flex-col border-t-2 border-base2 dark:border-base02">
               <AnnotationPanel
                 items={bookmarkHighlights}
                 variant="bookmarks"
@@ -535,10 +535,10 @@ export function ReaderPage() {
         {!zenMode && highlightsOpen && slug && (
           <>
             <div
-              className="w-1.5 shrink-0 cursor-col-resize bg-[#eee8d5] hover:bg-[#268bd2] active:bg-[#268bd2] dark:bg-[#073642] dark:hover:bg-[#268bd2] dark:active:bg-[#268bd2]"
+              className="w-1.5 shrink-0 cursor-col-resize bg-base2 hover:bg-blue active:bg-blue dark:bg-base02 dark:hover:bg-blue dark:active:bg-blue"
               onMouseDown={handleHighlightsResize}
             />
-            <div className="flex h-full min-h-0 flex-col border-t-2 border-[#eee8d5] dark:border-[#073642]">
+            <div className="flex h-full min-h-0 flex-col border-t-2 border-base2 dark:border-base02">
               <AnnotationPanel
                 items={colorHighlights}
                 variant="highlights"

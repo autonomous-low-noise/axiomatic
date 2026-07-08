@@ -14,6 +14,9 @@ src/pages/ReaderPage.tsx         — PDF viewer + notes split-pane + tabs + snip
 src/pages/LoopPage.tsx           — snip review carousel (sorted/shuffled modes)
 src/pages/SnipsPage.tsx          — cross-book snip browsing, filtering, bulk tagging
 src/pages/StatsPage.tsx          — study statistics dashboard (XP, sessions, progress)
+src/components/ui/               — UI primitives: Button, Input, Badge, Menu, Modal, Drawer, Panel (build ALL buttons/inputs/menus/dialogs from these)
+src/components/TagListEditor.tsx — shared tag-CRUD popover body (used by TagManager + SnipTagManager)
+src/components/TagCheckList.tsx  — shared tag checkbox list (used by TagAssigner + SnipTagAssigner)
 src/components/PdfViewer.tsx     — virtual-scroll PDF renderer (buffer=5 pages, imperative zoom)
 src/components/NotesPanel.tsx    — CodeMirror 6 with vim, markdown, KaTeX math
 src/components/TabBar.tsx        — horizontal tab strip with context menu (close, close others)
@@ -47,6 +50,12 @@ src/hooks/useDirPaths.ts        — extract dir paths from directories (shared a
 src/hooks/usePathMap.ts         — slug → full_path map for cross-device snip resolution
 src/hooks/useSwipe.ts           — touch swipe gesture detection (left/right/tap)
 src/hooks/usePinchZoom.ts       — two-finger pinch zoom gesture handling
+src/hooks/useDismissable.ts     — canonical dismiss lifecycle for floating UI (ESC / click-outside / scroll)
+src/hooks/useAnchoredPosition.ts — viewport-clamped positioning (anchor-below or cursor-point)
+src/lib/solarized.ts            — canonical Solarized map for TS code (keep in sync with @theme in index.css)
+src/lib/tagPalette.ts           — persisted tag colors (data, not theme — stored in tag defs on disk)
+src/lib/zIndex.ts               — central z-index scale (Z.raised / Z.drawer / Z.overlay / Z.modal)
+src/lib/cx.ts                   — class-fragment joiner used by ui/ primitives
 src/lib/storageKeys.ts          — centralized localStorage key constants
 src/extensions/                 — CodeMirror 6 plugins (editor-theme, image-paste, math-decoration)
 src-tauri/src/commands.rs        — general Tauri IPC commands (db, files, tags, project state)
@@ -149,10 +158,10 @@ Platform detection via `src/lib/platform.ts`. Adaptive render config (lower DPR,
 
 ## Conventions
 
-- Solarized palette: hard-coded hex values (`#fdf6e3` light bg, `#002b36` dark bg, etc.)
+- **Solarized design tokens**: the `@theme` block in `src/index.css` defines the ONLY color utilities (`bg-base03`…`bg-base3`, `text-blue`, `border-base2/50`, plus `white`/`black`). The default Tailwind palette is removed — off-token classes like `bg-blue-100` silently produce no CSS. TS code reads the same values from `src/lib/solarized.ts`. Raw hex values are allowed only in `solarized.ts`, `tagPalette.ts`, and PdfViewer's persisted highlight colors (stored data).
 - Tailwind 4 with `dark:` variants; dark mode toggled via `<html class="dark">`
 - Vim keybindings everywhere: h/j/k/l in overview grid, j/k scroll in reader, full vim in notes editor
-- No component library — all UI is hand-written
+- No external component library — shared hand-written primitives live in `src/components/ui/` (Button, Input, Badge, Menu, Modal, Drawer, Panel). Build new UI from these; extend a primitive rather than hand-rolling a sibling. Floating UI gets its dismiss/positioning behavior from `useDismissable`/`useAnchoredPosition`, and z-index from the `Z` scale in `src/lib/zIndex.ts` — never hand-roll ESC/click-outside listeners or literal `z-*` classes.
 - PDFs rendered via `pdfium://` custom protocol (native PDFium, JPEG output)
 - **Test-before-modify rule**: Before changing any logic, verify it has test coverage. If not, extract into a testable unit and write tests FIRST. This applies to all logic — component wiring, command lists, state assembly — not just leaf components. Tests must assert desired behavior, not mirror current implementation.
 - **Pre-release gate**: Always run `./scripts/prebuild.sh <version>` before pushing a release tag. Never tag manually. The script runs the full lint → typecheck → test pipeline and only tags if everything passes.
@@ -196,3 +205,4 @@ git push origin master --tags     # push commit + tag → triggers CI release
 - Bookmarks are highlights with `color = "bookmark"` — `useHighlights` splits them via `colorHighlights` / `bookmarkHighlights`.
 - **Slug migration** — When a PDF is renamed, `detect_orphaned_slugs` finds data referencing unknown slugs and suggests mappings via bigram similarity. `migrate_slug` atomically updates all storage tiers (SQLite + JSON + localStorage tabs). The `SlugMigrationDialog` surfaces after library scan on OverviewPage.
 - **Versioned migrations** — `db.rs` uses a `migrations` table with sequential version numbers. Add new migrations to the `MIGRATIONS` array; `init_db()` runs pending ones on startup.
+- **E2E is not in CI and its mocks track `@tauri-apps/api` internals** — `e2e/tauri-mocks.ts` must mirror what the installed API reads from `window.__TAURI_INTERNALS__` (e.g. v2.10+ requires `metadata.currentWindow/currentWebview`). The suite has pre-existing rot beyond that: a subset of specs fail for mock-staleness reasons unrelated to UI code. Also: Playwright reuses any server already on port 5173 (`reuseExistingServer`), so an unrelated dev server on that port silently hijacks the run.

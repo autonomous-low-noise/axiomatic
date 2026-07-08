@@ -110,14 +110,14 @@ export function ZoomableSnipImage({ snip, maxHeight = '60vh', globalShortcuts = 
           data-testid="snip-zoom-container"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
         >
-          <SnipImage snip={snip} className="rounded border border-[#eee8d5] dark:border-[#073642]" onSize={handleSize} pathMap={pathMap} dirPath={dirPath} />
+          <SnipImage snip={snip} className="rounded border border-base2 dark:border-base02" onSize={handleSize} pathMap={pathMap} dirPath={dirPath} />
         </div>
       </div>
       <div className="flex items-center gap-1">
         <button
           onClick={handleZoomOut}
           aria-label="Zoom out"
-          className="rounded p-1 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="rounded p-1 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
@@ -128,14 +128,14 @@ export function ZoomableSnipImage({ snip, maxHeight = '60vh', globalShortcuts = 
         <button
           onClick={handleZoomReset}
           aria-label="Reset zoom"
-          className="rounded px-1 py-0.5 text-[10px] tabular-nums text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="rounded px-1 py-0.5 text-[10px] tabular-nums text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
         >
           {Math.round(zoom * 100)}%
         </button>
         <button
           onClick={handleZoomIn}
           aria-label="Zoom in"
-          className="rounded p-1 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="rounded p-1 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />

@@ -23,6 +23,8 @@ import { TagManager } from '../components/TagManager'
 import { TagAssigner } from '../components/TagAssigner'
 import { SlugMigrationDialog } from '../components/SlugMigrationDialog'
 import type { OrphanCandidate } from '../components/SlugMigrationDialog'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
 
 interface MenuState {
   x: number
@@ -288,19 +290,16 @@ export function OverviewPage() {
 
   if (!loading && directories.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-[#fdf6e3] dark:bg-[#002b36]">
-        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[#93a1a1] dark:text-[#586e75]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-base3 dark:bg-base03">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-base1 dark:text-base01">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
         </svg>
-        <p className="text-[#657b83] dark:text-[#93a1a1]">No directories attached</p>
-        <button
-          onClick={handleAddDir}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
+        <p className="text-base00 dark:text-base1">No directories attached</p>
+        <Button variant="primary" size="lg" onClick={handleAddDir}>
           Attach Directory
-        </button>
+        </Button>
         {dirError && (
-          <p className="mt-2 max-w-xs break-all rounded bg-red-100 px-3 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+          <p className="mt-2 max-w-xs break-all rounded bg-red/10 px-3 py-2 text-xs text-red dark:bg-red/20 dark:text-red">
             {dirError}
           </p>
         )}
@@ -344,12 +343,12 @@ export function OverviewPage() {
   }, afterStarred)
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-      <div className="flex h-10 shrink-0 items-center overflow-x-auto border-b border-[#eee8d5] bg-[#fdf6e3] px-2 dark:border-[#073642] dark:bg-[#002b36]">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-base3 dark:bg-base03">
+      <div className="flex h-10 shrink-0 items-center overflow-x-auto border-b border-base2 bg-base3 px-2 dark:border-base02 dark:bg-base03">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           <button
             onClick={() => setExplorerOpen((o) => !o)}
-            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="shrink-0 rounded p-1.5 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
             aria-label="Projects"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -358,7 +357,7 @@ export function OverviewPage() {
           </button>
           <Link
             to="/snips"
-            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="shrink-0 rounded p-1.5 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
             aria-label="Snips"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -370,7 +369,7 @@ export function OverviewPage() {
             <button
               ref={tagBtnRef}
               onClick={() => setTagManagerOpen((o) => !o)}
-              className="rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              className="rounded p-1.5 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
               aria-label="Manage tags"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -379,16 +378,17 @@ export function OverviewPage() {
               </svg>
             </button>
           </div>
-          <button
+          <Button
+            variant="icon"
             onClick={refresh}
-            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="shrink-0"
             aria-label="Refresh library"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
-          </button>
+          </Button>
           {tags.length > 0 && (
             <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
               {tags.map((tag) => {
@@ -407,7 +407,7 @@ export function OverviewPage() {
                     className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
                       active
                         ? 'text-white'
-                        : 'text-[#586e75] dark:text-[#93a1a1] opacity-60 hover:opacity-100'
+                        : 'text-base01 dark:text-base1 opacity-60 hover:opacity-100'
                     }`}
                     style={active ? { backgroundColor: tag.color } : undefined}
                   >
@@ -425,7 +425,7 @@ export function OverviewPage() {
         <div className="flex shrink-0 items-center gap-1 pl-1">
           {filterOpen ? (
             <div className="relative flex shrink-0 items-center">
-              <input
+              <Input
                 ref={filterInputRef}
                 type="text"
                 value={filterQuery}
@@ -437,7 +437,7 @@ export function OverviewPage() {
                   }
                 }}
                 placeholder="Filter books…"
-                className="h-7 w-28 rounded border border-[#93a1a1] bg-[#fdf6e3] pl-2 pr-7 text-sm text-[#073642] outline-none focus:border-blue-400 sm:w-48 dark:border-[#073642] dark:bg-[#073642] dark:text-[#eee8d5] dark:focus:border-[#268bd2]"
+                className="w-28 pr-7 sm:w-48"
                 autoFocus
               />
               {filterQuery && (
@@ -446,7 +446,7 @@ export function OverviewPage() {
                     setFilterQuery('')
                     filterInputRef.current?.focus()
                   }}
-                  className="absolute right-1.5 text-[#93a1a1] hover:text-[#586e75] dark:hover:text-[#93a1a1]"
+                  className="absolute right-1.5 text-base1 hover:text-base01 dark:hover:text-base1"
                   aria-label="Clear filter"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -457,40 +457,42 @@ export function OverviewPage() {
               )}
             </div>
           ) : (
-            <button
+            <Button
+              variant="icon"
               onClick={() => setFilterOpen(true)}
-              className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+              className="shrink-0"
               aria-label="Filter books"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="icon"
             onClick={togglePalette}
-            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="shrink-0"
             aria-label="Command palette"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />
             </svg>
-          </button>
+          </Button>
           <SyncStatus {...syncStatus} />
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
       {loading ? (
         <div className="flex flex-1 items-center justify-center py-20">
-          <p className="text-[#657b83] dark:text-[#93a1a1]">Loading...</p>
+          <p className="text-base00 dark:text-base1">Loading...</p>
         </div>
       ) : (<>
       {starredBooks.length > 0 && (
         <section>
           <button
             onClick={() => toggleSection('starred')}
-            className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-[#eee8d5] dark:border-[#073642] text-[#586e75] dark:text-[#93a1a1]${selectedHeader === 'starred' ? ' border-l-2 border-l-[#268bd2] bg-[#eee8d5] dark:bg-[#073642]' : ' border-l-2 border-l-transparent bg-[#fdf6e3] dark:bg-[#002b36]'}`}
+            className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-base2 dark:border-base02 text-base01 dark:text-base1${selectedHeader === 'starred' ? ' border-l-2 border-l-blue bg-base2 dark:bg-base02' : ' border-l-2 border-l-transparent bg-base3 dark:bg-base03'}`}
             data-section-key="starred"
             {...(selectedHeader === 'starred' ? { 'data-header-selected': true } : {})}
           >
@@ -527,7 +529,7 @@ export function OverviewPage() {
           <section key={sec.dir.id}>
             <button
               onClick={() => toggleSection(dirKey)}
-              className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-[#eee8d5] dark:border-[#073642] text-[#586e75] dark:text-[#93a1a1]${selectedHeader === dirKey ? ' border-l-2 border-l-[#268bd2] bg-[#eee8d5] dark:bg-[#073642]' : ' border-l-2 border-l-transparent bg-[#fdf6e3] dark:bg-[#002b36]'}`}
+              className={`sticky top-0 z-10 flex w-full items-center gap-1 px-4 py-2 text-base font-semibold border-b border-base2 dark:border-base02 text-base01 dark:text-base1${selectedHeader === dirKey ? ' border-l-2 border-l-blue bg-base2 dark:bg-base02' : ' border-l-2 border-l-transparent bg-base3 dark:bg-base03'}`}
               data-section-key={dirKey}
               {...(selectedHeader === dirKey ? { 'data-header-selected': true } : {})}
             >
@@ -542,13 +544,13 @@ export function OverviewPage() {
                 let snipsTotal = 0, snipsSolid = 0
                 if (dirCounts) for (const [t, s] of Object.values(dirCounts)) { snipsTotal += t; snipsSolid += s }
                 return (
-                  <span className="ml-auto flex items-center gap-3 text-[10px] tabular-nums text-[#93a1a1] dark:text-[#586e75]">
+                  <span className="ml-auto flex items-center gap-3 text-[10px] tabular-nums text-base1 dark:text-base01">
                     {booksDone > 0 && <span>{booksDone}/{sec.books.length} done</span>}
                     {snipsTotal > 0 && (
                       <span className="flex items-center gap-1">
                         {snipsSolid}/{snipsTotal} solid
-                        <span className="inline-block h-1.5 w-16 rounded-full bg-[#93a1a1]/20">
-                          <span className="block h-full rounded-full bg-[#859900]" style={{ width: `${(snipsSolid / snipsTotal) * 100}%` }} />
+                        <span className="inline-block h-1.5 w-16 rounded-full bg-base1/20">
+                          <span className="block h-full rounded-full bg-green" style={{ width: `${(snipsSolid / snipsTotal) * 100}%` }} />
                         </span>
                       </span>
                     )}
@@ -579,7 +581,7 @@ export function OverviewPage() {
         )
       })}
       {textbooks.length === 0 && directories.length > 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-[#93a1a1] dark:text-[#657b83]">
+        <div className="flex flex-col items-center justify-center py-20 text-base1 dark:text-base00">
           <p className="text-sm">No PDFs found in attached directories.</p>
         </div>
       )}

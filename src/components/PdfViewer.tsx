@@ -6,12 +6,14 @@ import { usePageTextLayer, type PageTextLayer } from '../hooks/usePageTextLayer'
 import type { Highlight } from '../hooks/useHighlights'
 import { TextLayer } from './TextLayer'
 import { SnipOverlay } from './SnipOverlay'
+import { Menu } from './ui/Menu'
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { pruneWarmPages } from '../lib/warm-pages'
 import { buildPdfiumUrl } from '../lib/pdfium-url'
 import { getPlatformInfo } from '../lib/platform'
 import { getRenderConfig } from '../lib/render-config'
+import { sol } from '../lib/solarized'
 
 const PAGE_GAP = 16
 
@@ -415,18 +417,6 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
     [numPages, pageOffsets],
   )
 
-  // Close context menu on click elsewhere or scroll
-  useEffect(() => {
-    if (!contextMenu) return
-    const close = () => setContextMenu(null)
-    window.addEventListener('click', close)
-    window.addEventListener('scroll', close, true)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('scroll', close, true)
-    }
-  }, [contextMenu])
-
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, pageNum: number) => {
       const sel = window.getSelection()
@@ -658,7 +648,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
                 top,
                 width: layoutWidth,
                 height: pageHeight,
-                ...(isClipStart ? { borderTop: '3px solid #268bd2' } : inClipRange ? { borderTop: '2px solid #268bd2', opacity: 0.85 } : {}),
+                ...(isClipStart ? { borderTop: `3px solid ${sol.blue}` } : inClipRange ? { borderTop: `2px solid ${sol.blue}`, opacity: 0.85 } : {}),
               }}
               onContextMenu={(e) => handleContextMenu(e, pageNum)}
             >
@@ -678,7 +668,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
                 />
               ) : (
                 <div
-                  className="block h-full w-full bg-[#eee8d5] dark:bg-[#073642]"
+                  className="block h-full w-full bg-base2 dark:bg-base02"
                   style={{ position: 'relative', zIndex: 0 }}
                 />
               )}
@@ -710,7 +700,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
                 links.map((link, li) => (
                   <div
                     key={li}
-                    className="absolute cursor-pointer hover:bg-[#268bd2]/20"
+                    className="absolute cursor-pointer hover:bg-blue/20"
                     style={{
                       left: `${link.rect.x * 100}%`,
                       top: `${link.rect.y * 100}%`,
@@ -743,7 +733,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
   return (
     <div
       ref={mergedContainerRef}
-      className="pdf-reader flex-1 overflow-y-auto bg-[#eee8d5] dark:bg-[#073642]"
+      className="pdf-reader flex-1 overflow-y-auto bg-base2 dark:bg-base02"
     >
       {numPages > 0 && (
         <div ref={spacerRef}>
@@ -761,15 +751,14 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
         </div>
       )}
       {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[160px] rounded border border-[#93a1a1]/30 bg-[#fdf6e3] py-1 shadow-lg dark:border-[#586e75]/30 dark:bg-[#002b36]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
+        <Menu
+          point={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
         >
           {contextMenu.type === 'selection' && (
             <>
               <button
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
                 onClick={() => handleHighlightColor('bookmark')}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -780,7 +769,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
               {HIGHLIGHT_COLORS.map((hc) => (
                 <button
                   key={hc.color}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
                   onClick={() => handleHighlightColor(hc.color)}
                 >
                   <span
@@ -795,7 +784,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           {contextMenu.type === 'page' && (
             <>
               <button
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
                 onClick={handlePageBookmark}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -803,9 +792,9 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
                 </svg>
                 Bookmark page
               </button>
-              <div className="my-1 h-px bg-[#eee8d5] dark:bg-[#073642]" />
+              <div className="my-1 h-px bg-base2 dark:bg-base03" />
               <button
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
                 onClick={() => handleClipStart(contextMenu.pageNum!)}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -816,7 +805,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
               </button>
               {clipStartPage != null && contextMenu.pageNum! > clipStartPage && (
                 <button
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-base01 hover:bg-base2 dark:text-base1 dark:hover:bg-base03"
                   onClick={() => handleClipEnd(contextMenu.pageNum!)}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -828,7 +817,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
               )}
               {clipStartPage != null && (
                 <button
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#dc322f] hover:bg-[#eee8d5] dark:hover:bg-[#073642]"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red hover:bg-base2 dark:hover:bg-base03"
                   onClick={handleClipCancel}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -842,7 +831,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
           )}
           {contextMenu.type === 'highlight' && (
             <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[#dc322f] hover:bg-[#eee8d5] dark:hover:bg-[#073642]"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red hover:bg-base2 dark:hover:bg-base03"
               onClick={handleDeleteFromMenu}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -854,7 +843,7 @@ const PdfViewerInner = React.forwardRef<PdfViewerHandle, Props>(function PdfView
               Delete highlight
             </button>
           )}
-        </div>
+        </Menu>
       )}
     </div>
   )

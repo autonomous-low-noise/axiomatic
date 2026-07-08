@@ -254,7 +254,7 @@ describe('SnipsPage', () => {
     fireEvent.click(screen.getByText('All tags'))
 
     const searchInput = screen.getByPlaceholderText('Search tags...')
-    const dropdown = searchInput.closest('[class*="absolute"]')!
+    const dropdown = searchInput.closest('[class*="fixed"]')!
 
     fireEvent.change(searchInput, { target: { value: 'alg' } })
 
@@ -725,7 +725,7 @@ describe('SnipsPage', () => {
     renderPage(snips)
 
     fireEvent.click(screen.getByText('All tags'))
-    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="fixed"]')!
     fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 1'))
 
     expect(screen.getByText('In B1')).toBeInTheDocument()
@@ -836,7 +836,7 @@ describe('SnipsPage', () => {
 
     // Open tag dropdown and select both tags
     fireEvent.click(screen.getByText('All tags'))
-    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="fixed"]')!
     fireEvent.click(within(dropdown as HTMLElement).getByText('algebra'))
     fireEvent.click(within(dropdown as HTMLElement).getByText('topology'))
 
@@ -855,7 +855,7 @@ describe('SnipsPage', () => {
     renderPage(snips)
 
     fireEvent.click(screen.getByText('All tags'))
-    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="fixed"]')!
     fireEvent.click(within(dropdown as HTMLElement).getByText('algebra'))
     fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 1'))
     fireEvent.click(within(dropdown as HTMLElement).getByText('Batch 2'))
@@ -889,7 +889,7 @@ describe('SnipsPage', () => {
 
     // Select a tag filter
     fireEvent.click(screen.getByText('All tags'))
-    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="absolute"]')!
+    const dropdown = screen.getByPlaceholderText('Search tags...').closest('[class*="fixed"]')!
     fireEvent.click(within(dropdown as HTMLElement).getByText('topology'))
     expect(screen.getByText('1 tag')).toBeInTheDocument()
 

@@ -26,9 +26,9 @@ function Checkmark() {
 
 function ProgressBar() {
   return (
-    <div className="w-16 h-1 rounded-full bg-[#eee8d5] dark:bg-[#073642]">
+    <div className="w-16 h-1 rounded-full bg-base2 dark:bg-base02">
       <div
-        className="h-1 rounded-full bg-[#93a1a1] dark:bg-[#586e75] animate-pulse"
+        className="h-1 rounded-full bg-base1 dark:bg-base01 animate-pulse"
         style={{ width: '30%' }}
       />
     </div>
@@ -69,7 +69,7 @@ export function SyncStatus({ phase, label, bookCount }: SyncStatusProps) {
 
   return (
     <span
-      className={`ml-auto flex items-center gap-1.5 text-xs text-[#93a1a1] transition-opacity duration-500 dark:text-[#586e75] ${faded ? 'opacity-0' : 'opacity-100'}`}
+      className={`ml-auto flex items-center gap-1.5 text-xs text-base1 transition-opacity duration-500 dark:text-base01 ${faded ? 'opacity-0' : 'opacity-100'}`}
     >
       {isDone ? <Checkmark /> : <ProgressBar />}
       {label}

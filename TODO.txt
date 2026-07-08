@@ -1,3 +1,4 @@
+- [PRIO] add "index pages" per document - semantically, encode the summary / contents of a given doc
 - [DONE] refresh overview for new docs
 - [DONE] page counter buggy
 - [DONE] untag does not remove selection

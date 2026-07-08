@@ -6,6 +6,7 @@ import {
 } from '@codemirror/view'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import { getNoteImage, saveNoteImage } from '../lib/notes'
+import { sol } from '../lib/solarized'
 
 const blobCache = new Map<string, string>()
 
@@ -36,7 +37,7 @@ class ImageWidget extends WidgetType {
       img.src = cached
     } else {
       img.style.height = '48px'
-      img.style.background = '#e5e7eb'
+      img.style.background = sol.base2
       const numId = parseInt(this.id, 10)
       if (!isNaN(numId)) {
         getNoteImage(numId).then((data) => {

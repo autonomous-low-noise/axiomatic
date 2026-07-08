@@ -232,7 +232,8 @@ describe('OverviewPage collapsible sections', () => {
       expect(cls).toContain('sticky')
       expect(cls).toContain('top-0')
       // Must have opaque bg so content doesn't bleed through when stuck
-      expect(cls).toMatch(/bg-\[#[0-9a-f]+\]/)
+      // (a Solarized token bg with no /opacity modifier)
+      expect(cls).toMatch(/(^| )bg-base\d{1,2}( |$)/)
     }
   })
 

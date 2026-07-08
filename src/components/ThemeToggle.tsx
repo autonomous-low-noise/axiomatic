@@ -1,12 +1,13 @@
 import { useTheme } from '../hooks/useTheme'
+import { Button } from './ui/Button'
 
 export function ThemeToggle() {
   const { theme, cycle } = useTheme()
 
   return (
-    <button
+    <Button
+      variant="icon"
       onClick={cycle}
-      className="rounded p-1.5 text-[#586e75] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
       aria-label={`Theme: ${theme}`}
     >
       {theme === 'light' && (
@@ -32,6 +33,6 @@ export function ThemeToggle() {
           />
         </svg>
       )}
-    </button>
+    </Button>
   )
 }

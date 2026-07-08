@@ -311,6 +311,13 @@ export async function installTauriMocks(
         },
         convertFileSrc: (path: string) => path,
         transformCallback: () => 0,
+        // @tauri-apps/api v2.10+ reads window/webview labels from here
+        // (getCurrentWindow/getCurrentWebview) — without it the app throws
+        // "Cannot read properties of undefined (reading 'metadata')" on mount.
+        metadata: {
+          currentWindow: { label: 'main' },
+          currentWebview: { label: 'main', windowLabel: 'main' },
+        },
       },
       writable: false,
       configurable: false,

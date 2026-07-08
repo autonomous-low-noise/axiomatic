@@ -60,7 +60,7 @@ export function Layout() {
   // Mobile: no titlebar, no padding, no rounded corners
   if (platform.isMobile) {
     return (
-      <div className="flex h-screen flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
+      <div className="flex h-screen flex-col bg-base3 dark:bg-base03">
         {palette}
         <div className="flex min-h-0 flex-1 flex-col">
           <Outlet />
@@ -72,7 +72,7 @@ export function Layout() {
   // Linux: no titlebar, no outer padding
   if (platform.os === 'linux') {
     return (
-      <div className="flex h-screen flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
+      <div className="flex h-screen flex-col bg-base3 dark:bg-base03">
         {palette}
         <div className="flex min-h-0 flex-1 flex-col">
           <Outlet />
@@ -84,7 +84,7 @@ export function Layout() {
   // macOS/Windows: titlebar + window chrome
   return (
     <div className="flex h-screen flex-col p-2">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-[#fdf6e3] shadow-[0_1px_12px_rgba(0,0,0,0.2)] dark:bg-[#002b36] dark:shadow-[0_1px_12px_rgba(0,0,0,0.55)]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-base3 shadow-[0_1px_12px_rgba(0,0,0,0.2)] dark:bg-base03 dark:shadow-[0_1px_12px_rgba(0,0,0,0.55)]">
         <Titlebar />
         {palette}
         <div className="flex min-h-0 flex-1 flex-col">

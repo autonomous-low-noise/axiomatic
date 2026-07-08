@@ -172,15 +172,15 @@ export function NotesPanel({ slug, page, content, onUpdate, externalEditorRef, w
   const modeDisplay = vimMode.toUpperCase().replace(' ', ' -- ')
 
   return (
-    <div className="flex h-full min-h-0 shrink-0 flex-col border-l border-[#eee8d5] bg-[#fdf6e3] dark:border-[#073642] dark:bg-[#002b36]" style={width ? { width } : { width: 384 }}>
-      <div className="flex h-12 shrink-0 items-center border-b border-[#eee8d5] px-4 dark:border-[#073642]">
-        <span className="text-sm font-medium text-[#586e75] dark:text-[#93a1a1]">
+    <div className="flex h-full min-h-0 shrink-0 flex-col border-l border-base2 bg-base3 dark:border-base02 dark:bg-base03" style={width ? { width } : { width: 384 }}>
+      <div className="flex h-12 shrink-0 items-center border-b border-base2 px-4 dark:border-base02">
+        <span className="text-sm font-medium text-base01 dark:text-base1">
           Notes &mdash; Page {page}
         </span>
       </div>
       <div ref={containerRef} className="flex-1 overflow-hidden" />
-      <div className="flex h-7 shrink-0 items-center border-t border-[#eee8d5] bg-[#eee8d5] px-3 dark:border-[#073642] dark:bg-[#073642]">
-        <span className="text-xs font-semibold tracking-wide text-[#93a1a1] dark:text-[#657b83]">
+      <div className="flex h-7 shrink-0 items-center border-t border-base2 bg-base2 px-3 dark:border-base02 dark:bg-base02">
+        <span className="text-xs font-semibold tracking-wide text-base1 dark:text-base00">
           -- {modeDisplay} --
         </span>
       </div>

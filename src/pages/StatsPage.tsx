@@ -9,12 +9,12 @@ export function StatsPage() {
   const dirPaths = useDirPaths(directories)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#fdf6e3] dark:bg-[#002b36]">
-      <div className="flex h-10 shrink-0 items-center border-b border-[#eee8d5] bg-[#fdf6e3] px-3 dark:border-[#073642] dark:bg-[#002b36]">
+    <div className="flex min-h-0 flex-1 flex-col bg-base3 dark:bg-base03">
+      <div className="flex h-10 shrink-0 items-center border-b border-base2 bg-base3 px-3 dark:border-base02 dark:bg-base03">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <Link
             to="/"
-            className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+            className="shrink-0 rounded p-1.5 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
             aria-label="Back to library"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -22,11 +22,11 @@ export function StatsPage() {
               <polyline points="12 19 5 12 12 5" />
             </svg>
           </Link>
-          <span className="text-sm font-medium text-[#586e75] dark:text-[#93a1a1]">Stats</span>
+          <span className="text-sm font-medium text-base01 dark:text-base1">Stats</span>
         </div>
         <button
           onClick={togglePalette}
-          className="shrink-0 rounded p-1.5 text-[#657b83] hover:bg-[#eee8d5] dark:text-[#93a1a1] dark:hover:bg-[#073642]"
+          className="shrink-0 rounded p-1.5 text-base00 hover:bg-base2 dark:text-base1 dark:hover:bg-base02"
           aria-label="Command palette"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

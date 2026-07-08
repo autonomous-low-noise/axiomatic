@@ -57,7 +57,7 @@ export function SnipImage({ snip, className, onSize, pathMap, dirPath }: { snip:
   return (
     <canvas
       ref={canvasRef}
-      className={className ?? 'mt-4 max-h-[60vh] max-w-full rounded border border-[#eee8d5] object-contain dark:border-[#073642]'}
+      className={className ?? 'mt-4 max-h-[60vh] max-w-full rounded border border-base2 object-contain dark:border-base02'}
     />
   )
 }

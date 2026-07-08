@@ -79,8 +79,8 @@ const PageTile = memo(function PageTile({
       onClick={() => onNavigate(pageNum)}
       className={`group relative block shrink-0 rounded ${
         isCurrent
-          ? 'ring-2 ring-[#268bd2]'
-          : 'ring-1 ring-[#93a1a1]/30 dark:ring-[#586e75]/30'
+          ? 'ring-2 ring-blue'
+          : 'ring-1 ring-base1/30 dark:ring-base01/30'
       }`}
       style={{ width: tileWidth, height: tileHeight }}
     >
@@ -95,13 +95,13 @@ const PageTile = memo(function PageTile({
         />
       ) : (
         <div
-          className="rounded bg-[#eee8d5] dark:bg-[#073642]"
+          className="rounded bg-base2 dark:bg-base02"
           style={{ width: tileWidth, height: tileHeight }}
         />
       )}
       <span className={`absolute bottom-0 left-0 right-0 rounded-b px-1 py-0.5 text-center text-[10px] tabular-nums ${
         isCurrent
-          ? 'bg-[#268bd2] text-white'
+          ? 'bg-blue text-white'
           : 'bg-black/40 text-white opacity-0 group-hover:opacity-100'
       }`}>
         {pageNum}
